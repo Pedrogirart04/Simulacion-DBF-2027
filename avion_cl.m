@@ -1,4 +1,4 @@
-%Prueba uriel ana
+
 function [T_or_F, filaInterp] = avion_cl(data_in, cl_query)
     % v4.0: Interpolación Parabólica Robusta
     if ischar(data_in) || isstring(data_in)
