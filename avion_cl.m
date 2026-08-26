@@ -1,4 +1,5 @@
 %Prueba Github
+%Prueba 2 Peter Parker
 
 function [T_or_F, filaInterp] = avion_cl(data_in, cl_query)
     % v4.0: Interpolación Parabólica Robusta
