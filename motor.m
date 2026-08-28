@@ -1,4 +1,5 @@
 function [T, filaInterp] = motor(data_in, throttle_query)
+%%Hola
 % motor: Lee un archivo .dat de motor O una tabla ya cargada.
 % Devuelve la tabla (T) y, si se pide, una fila interpolada.
 %
