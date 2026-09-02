@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="CONDOR-S-2026-04-02-13-30-46.csv">
+         <formula>InfoVuelo=&quot;Probamos Banner no se desplego&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-02-13-48-40.csv">
+         <formula>InfoVuelo=&quot;Probamos banner de 3m se desplego mal&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-02-14-26-40.csv">
+         <formula>InfoVuelo=&quot;Probamos banner de 3m&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-02-15-35-21.csv">
+         <formula>InfoVuelo=&quot;Probamos Banner de 5m&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-02-17-03-20.csv">
+         <formula>InfoVuelo=&quot;Probamos carga maxima&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-02-18-39-31.csv">
+         <formula>InfoVuelo=&quot;Se cayo nos quedamos sin bateria, lo hicimos sin la telemetria de las baterias&quot;</formula>
+      </file>
+   </project>
+</flowfile>

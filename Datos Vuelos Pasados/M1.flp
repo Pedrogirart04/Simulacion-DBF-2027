@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="C:\Users\Jose_\OneDrive\Documents\AIAA\Telemetria\Dia 4 (Wichita)\CONDOR-S-2026-04-15-19-45-45.csv">
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+      </file>
+      <file filename="C:\Users\Jose_\OneDrive\Documents\AIAA\Telemetria\Dia 4 (Wichita)\CONDOR-S-2026-04-15-21-02-21.csv">
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-18-09-09-14.csv">
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+         <formula>A=CurrentA</formula>
+      </file>
+   </project>
+</flowfile>

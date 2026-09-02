@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="CONDOR-S-2026-04-15-15-02-18.csv">
+         <formula>VoltajeMati=4.2187-0.0049*CurrentA</formula>
+         <formula>VoltajeMati2=LiPo1V+0.00283*CurrentA+0.0000341*CurrentA*CurrentA</formula>
+         <formula>VoltajeMati3=(LiPo1V+LiPo2V+LiPo3V+LiPo4V+LiPo5V+LiPo6V+LiPo7V+LiPo8V)/8+0.0025*CurrentA+0.00003*CurrentA*CurrentA</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-15-16-11-13.csv">
+         <formula>VoltajeMati2=LiPo1V+0.00283*CurrentA+0.0000341*CurrentA*CurrentA</formula>
+         <formula>InfoVuelo=&quot;Prueba estatica de motor con la bateria 1&quot;</formula>
+         <formula>A=CurrentA/150+3.5</formula>
+         <formula>VoltajeMati3=(LiPo1V+LiPo2V+LiPo3V+LiPo4V+LiPo5V+LiPo6V+LiPo7V+LiPo8V)/8+0.0025*CurrentA+0.00003*CurrentA*CurrentA</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-15-19-45-45.csv">
+         <formula>InfoVuelo=&quot;Prueba Estatica de mati&quot;</formula>
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+         <formula>A=CurrentA</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-15-21-02-21.csv">
+         <formula>InfoVuelo=&quot;Prueba Estatica de mati&quot;</formula>
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-15-22-26-30.csv">
+         <formula>InfoVuelo=&quot;Prueba Estatica de mati&quot;</formula>
+         <formula>vr = LiPo1V +(-0.009903)*CurrentA +(-0.000077)*CurrentA*CurrentA +(0.004760)*CurrentA*LiPo1V</formula>
+         <formula>A=CurrentA</formula>
+      </file>
+   </project>
+</flowfile>
