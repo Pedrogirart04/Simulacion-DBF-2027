@@ -44,10 +44,9 @@ csv_file = 'CONDOR-S-2026-04-02-15-35-21.csv';
 
 panels = {
     {'Throttle'}
-    {'Airspeed_kmh'}
-    {'Altitude_m'}
+    {'Airspeed_kmh','Altitude_m'}
     {'R_angle', 'P_angle'}
-    {'Current_A'}
+    {'AccX_g', 'AccY_g', 'AccZ_g'}
 };
 
 % --- RANGO TEMPORAL (opcional) ---
