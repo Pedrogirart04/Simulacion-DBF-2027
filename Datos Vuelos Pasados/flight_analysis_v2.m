@@ -1,10 +1,12 @@
 %% flight_analysis.m
 % Análisis completo de datos de vuelo — Aero ITBA DBF
-% Lee el CSV procesado (con t(s) como primera columna) y genera
+% Lee cualquier CSV de vuelo (crudo o procesado) y genera
 % 6 subplots sincronizados con las variables clave del vuelo.
 %
+% REQUISITO: leer_vuelo.m debe estar en el mismo directorio
+%
 % USO:
-%   1. Ajustar la sección CONFIGURACIÓN (archivo, offsets)
+%   1. Ajustar csv_file
 %   2. Correr el script
 %   3. Usar zoom en cualquier panel — todos se sincronizan
 
@@ -14,15 +16,11 @@ clc; clear; close all;
 %  CONFIGURACIÓN — Modificar según el vuelo
 %  ========================================================================
 
-csv_file = 'vuelo_procesado.csv';   % Archivo CSV con t(s) como col 1
-
-% Offsets de sensores (medir de los primeros segundos en tierra)
-roll_offset  = -166;    % [°] R.angle en tierra (restar para corregir)
-pitch_offset = 10;      % [°] P.angle en tierra (restar para corregir)
+csv_file = 'CONDOR-S-2026-04-02-15-35-21.csv';
 
 % Rango de throttle del transmisor (para normalizar a 0-100%)
-throttle_min = -1024;   % Valor de throttle con stick abajo
-throttle_max = 1024;    % Valor de throttle con stick arriba
+throttle_min = -1024;   % Valor de throttle con stick abajo (0%)
+throttle_max = 1024;    % Valor de throttle con stick arriba (100%)
 
 % Umbrales para detección automática de fases
 throttle_idle_threshold = -500;   % Por debajo de esto = motor apagado
@@ -32,21 +30,26 @@ current_cutoff_threshold = 5;     % [A] Por debajo = motor cortado
 %  LECTURA DE DATOS
 %  ========================================================================
 
-data = readtable(csv_file);
+data = leer_vuelo(csv_file);
 
-t           = data.t_s_;
-airspeed_kph = data.Airspeed_km_h_;
-altitude    = data.Altitude_m_;
-roll_raw    = data.R_angle___;
-pitch_raw   = data.P_angle___;
-current     = data.Current_A_;
-vfas        = data.VFAS_V_;
+t            = data.t_s;
+airspeed_kph = data.Airspeed_kmh;
+altitude     = data.Altitude_m;
+roll_raw     = data.R_angle;
+pitch_raw    = data.P_angle;
+current      = data.Current_A;
+vfas         = data.VFAS_V;
 throttle_raw = data.Throttle;
 elevator_raw = data.Elevator;
 aileron_raw  = data.Aileron;
 rudder_raw   = data.Rudder;
-ls1         = data.LS1;
-ls2         = data.LS2;
+ls1          = data.LS1;
+ls2          = data.LS2;
+
+% Offsets automáticos: promedio de los primeros 5 segundos (avión en tierra)
+n_ground = sum(t < 5);
+roll_offset  = mean(roll_raw(1:n_ground));
+pitch_offset = mean(pitch_raw(1:n_ground));
 
 %% ========================================================================
 %  PROCESAMIENTO
@@ -57,7 +60,6 @@ airspeed_ms = airspeed_kph / 3.6;
 
 % Corregir roll y pitch por offset del sensor
 roll_corr = roll_raw - roll_offset;
-% Normalizar a [-180, 180]
 roll_corr = mod(roll_corr + 180, 360) - 180;
 
 pitch_corr = pitch_raw - pitch_offset;
@@ -97,7 +99,6 @@ t_ls1 = t(idx_ls1 + 1);
 % Motor cortado (corriente baja sostenida)
 idx_cutoff = find(current(1:end-1) > current_cutoff_threshold & ...
                   current(2:end) <= current_cutoff_threshold);
-% Filtrar: buscar el último corte significativo (no un glitch)
 t_cutoff = [];
 for k = 1:length(idx_cutoff)
     idx = idx_cutoff(k);
@@ -213,6 +214,7 @@ linkaxes(ax, 'x');
 
 % Resumen en consola
 fprintf('\n=== RESUMEN DEL VUELO ===\n');
+fprintf('Offsets aplicados: roll = %.1f°, pitch = %.1f°\n', roll_offset, pitch_offset);
 fprintf('Duración total: %.1f s (%.1f min)\n', t(end), t(end)/60);
 fprintf('Energía consumida: %.3f Ah\n', energy_Ah(end));
 if ~isempty(t_throttle_up)

@@ -2,16 +2,19 @@
 % Herramienta rápida para graficar datos de vuelo.
 % Definí los paneles que querés ver y listo.
 %
+% REQUISITO: leer_vuelo.m debe estar en el mismo directorio
+%
 % USO:
 %   1. Ajustar csv_file
 %   2. Definir panels: cada fila = un subplot, cada celda = una variable
 %   3. (Opcional) Definir t_range para hacer zoom temporal
-%   4. (Opcional) Definir offsets de sensores
-%   5. Correr
+%   4. Correr
 %
-% Para ver los nombres de columna disponibles, correr:
-%   data = readtable('vuelo_procesado.csv');
-%   disp(data.Properties.VariableNames');
+% NOMBRES DE COLUMNA DISPONIBLES:
+%   t_s, Airspeed_kmh, Altitude_m, R_angle, P_angle,
+%   Current_A, VFAS_V, VSpeed_ms, Throttle, Elevator,
+%   Aileron, Rudder, AccX_g, AccY_g, AccZ_g,
+%   LiPo1..LiPo8, LS1, LS2
 
 clc; close all;
 
@@ -19,49 +22,46 @@ clc; close all;
 %  CONFIGURACIÓN RÁPIDA — Tocar solo esto
 %  ========================================================================
 
-csv_file = 'vuelo_procesado.csv';
+csv_file = 'CONDOR-S-2026-04-02-15-35-21.csv';
 
 % --- QUÉ GRAFICAR ---
 % Cada fila es un subplot. Cada celda dentro es una variable.
-% Usar los nombres de columna del CSV tal cual aparecen en MATLAB.
 %
 % Ejemplos:
 %
 %   Solo airspeed:
-%     panels = { {'Airspeed_km_h_'} };
+%     panels = { {'Airspeed_kmh'} };
 %
 %   Roll y pitch juntos, airspeed aparte:
-%     panels = { {'R_angle___', 'P_angle___'}
-%                {'Airspeed_km_h_'} };
+%     panels = { {'R_angle', 'P_angle'}
+%                {'Airspeed_kmh'} };
 %
-%   Todo lo que quieras:
+%   Zoom a la segunda vuelta:
 %     panels = { {'Throttle'}
-%                {'Airspeed_km_h_'}
-%                {'Altitude_m_'}
-%                {'R_angle___', 'P_angle___'}
-%                {'Current_A_', 'VFAS_V_'} };
+%                {'Airspeed_kmh'}
+%                {'Current_A'} };
+%     t_range = [74, 133];
 
 panels = {
     {'Throttle'}
-    {'Airspeed_km_h_'}
-    {'Altitude_m_'}
-    {'R_angle___', 'P_angle___'}
-    {'Current_A_'}
+    {'Airspeed_kmh'}
+    {'Altitude_m'}
+    {'R_angle', 'P_angle'}
+    {'Current_A'}
 };
 
 % --- RANGO TEMPORAL (opcional) ---
 % Dejar vacío [] para ver todo el vuelo
 % Poner [t_inicio, t_fin] para hacer zoom
-t_range = [];           % Ejemplos: [70, 140] o [0, 50] o []
+t_range = [];
 
 % --- OFFSETS DE SENSORES (opcional) ---
-% Si están definidos, se aplican automáticamente a R.angle y P.angle
-% Poner [] para NO corregir
-roll_offset  = -166;    % [°] o []
-pitch_offset = 10;      % [°] o []
+% Dejar [] para cálculo automático (promedio primeros 5s en tierra)
+% Poner un número para forzar un valor manual
+roll_offset  = [];
+pitch_offset = [];
 
 % --- MARCAS DE VUELTA (opcional) ---
-% Si es true, dibuja líneas verticales en las transiciones de LS1
 show_lap_marks = true;
 
 %% ========================================================================
@@ -70,25 +70,19 @@ show_lap_marks = true;
 
 % Leer datos
 if ~exist('data', 'var')
-    data = readtable(csv_file);
-    fprintf('Archivo cargado: %s (%d filas)\n', csv_file, height(data));
+    data = leer_vuelo(csv_file);
 end
+t = data.t_s;
 
-% Buscar columna de tiempo
-t_col_candidates = {'t_s_', 'ts', 't'};
-t_col = '';
-for k = 1:length(t_col_candidates)
-    if ismember(t_col_candidates{k}, data.Properties.VariableNames)
-        t_col = t_col_candidates{k};
-        break;
-    end
+% Calcular offsets automáticos si no fueron definidos manualmente
+if isempty(roll_offset) && ismember('R_angle', data.Properties.VariableNames)
+    n_ground = sum(t < 5);
+    roll_offset = mean(data.R_angle(1:n_ground));
 end
-if isempty(t_col)
-    % Si no encuentra, usar la primera columna numérica
-    t_col = data.Properties.VariableNames{1};
-    fprintf('⚠ No encontré columna t(s), usando "%s"\n', t_col);
+if isempty(pitch_offset) && ismember('P_angle', data.Properties.VariableNames)
+    n_ground = sum(t < 5);
+    pitch_offset = mean(data.P_angle(1:n_ground));
 end
-t = data.(t_col);
 
 % Aplicar rango temporal
 if ~isempty(t_range)
@@ -101,15 +95,13 @@ t_plot = t(mask);
 % Mapa de nombres bonitos para los labels
 label_map = containers.Map( ...
     {'Throttle', 'Elevator', 'Aileron', 'Rudder', ...
-     'Airspeed_km_h_', 'Air_speed_km_h_', 'AirSpeed_km_h_', ...
-     'Altitude_m_', ...
-     'R_angle___', 'P_angle___', ...
-     'Current_A_', 'VFAS_V_', ...
-     'AccX_g_', 'AccY_g_', 'AccZ_g_', ...
-     'VSpeed_m_s_'}, ...
+     'Airspeed_kmh', 'Altitude_m', ...
+     'R_angle', 'P_angle', ...
+     'Current_A', 'VFAS_V', ...
+     'AccX_g', 'AccY_g', 'AccZ_g', ...
+     'VSpeed_ms'}, ...
     {'Throttle', 'Elevator', 'Aileron', 'Rudder', ...
-     'Airspeed [km/h]', 'Airspeed [km/h]', 'Airspeed [km/h]', ...
-     'Altitud [m]', ...
+     'Airspeed [km/h]', 'Altitud [m]', ...
      'Roll [°]', 'Pitch [°]', ...
      'Corriente [A]', 'Voltaje [V]', ...
      'AccX [g]', 'AccY [g]', 'AccZ [g]', ...
