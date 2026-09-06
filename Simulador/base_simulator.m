@@ -55,20 +55,6 @@ scoring_type = 'none';   % 'none', 'M1', 'M2', 'M3'
 %% ========================================================================
 %  SECCIÓN 2: CARGA DE DATOS
 %  ========================================================================
-% Configurar paths relativos al repositorio
-repo_root = fileparts(mfilename('fullpath'));  % carpeta donde está ESTE script
-% Si el script está en una subcarpeta, subir un nivel:
-% repo_root = fileparts(fileparts(mfilename('fullpath')));
-addpath(fullfile(repo_root, 'simulador'));
-addpath(fullfile(repo_root, 'datos', 'helices'));
-addpath(fullfile(repo_root, 'datos', 'motores'));
-addpath(fullfile(repo_root, 'datos', 'polares'));
-addpath(fullfile(repo_root, 'analisis_vuelo'));
-repo_root = fileparts(fileparts(mfilename('fullpath')));  % sube de simulador/ a raíz
-
-%Si el archivo es M1 desde misiones/ descomentar la linea de abajo
-%repo_root = fileparts(fileparts(mfilename('fullpath')));  % sube de misiones/ a raíz
-%Borrar el otro que sube de simulador/ a raiz
 
 fprintf('Cargando datos...\n');
 
