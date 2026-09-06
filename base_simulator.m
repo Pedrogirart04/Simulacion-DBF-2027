@@ -30,7 +30,7 @@ n_vueltas    = 3;                % Cantidad de vueltas a simular
 largo_pierna = [100, 130];       % [m] Largo de pierna 1 y pierna 2
 bank_angle   = 60;               % [°] Bank angle en los giros (positivo)
 t_transicion = 1.0;              % [s] Tiempo para rolear de 0° a bank
-heading_offset = 13;             % [°] Corrección empírica de overshoot en giro
+heading_offset = 13;             % [°] 13° Corrección empírica de overshoot en giro
 
 % --- Hecho para Banner, Modificable para sensor ---
 % --- Banner (poner 0 si no hay) ---
@@ -238,7 +238,8 @@ for vuelta = 1:n_vueltas
                 inform, Energy, t, S_Banner, cd_Banner);
     end
     if mision_abortada; break; end
-    roll_rad = 0;   % Snap final para limpiar residuo numérico
+    roll_rad = 0;
+    yaw_rad = heading_base + deg2rad(180);   % Snap heading al valor exacto
     fprintf(' OK (heading = %.1f°)\n', rad2deg(yaw_rad));
 
     % =====================================================================
@@ -261,8 +262,9 @@ for vuelta = 1:n_vueltas
     end
     if mision_abortada; break; end
     fprintf(' OK (%.1f m)\n', sqrt((x-x0)^2+(y-y0)^2));
+    
 
-    % =====================================================================
+        % =====================================================================
     %  GIRO 2 (180°, vuelve al heading original)
     % =====================================================================
     heading_target = heading_base + heading_giro2;
@@ -327,6 +329,7 @@ for vuelta = 1:n_vueltas
     end
     if mision_abortada; break; end
     roll_rad = 0;
+    yaw_rad = heading_base + deg2rad(360);   % Snap heading al valor exacto
     fprintf(' OK (heading = %.1f°)\n', rad2deg(yaw_rad));
 
     % =====================================================================

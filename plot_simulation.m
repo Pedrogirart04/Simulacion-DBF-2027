@@ -115,7 +115,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     ylabel('V [m/s]');
     title('Velocidad');
 
-    % --- Panel 2: CL y CD ---
+        % --- Panel 2: CL y CD ---
     ax(2) = subplot(n_panels, 1, 2);
     yyaxis left
     plot(log_t, log_cl, 'Color', [0.8 0.2 0.2], 'LineWidth', 1.0);
@@ -123,10 +123,12 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     yline(CL_max, '--r', sprintf('CL_{max} = %.2f', CL_max), ...
           'LineWidth', 1.0, 'LabelHorizontalAlignment', 'left', 'FontSize', 7);
     ylabel('C_L');
+    ax(2).YAxis(1).Color = [0.8 0.2 0.2];
 
     yyaxis right
     plot(log_t, log_cd, 'Color', [0.2 0.6 0.3], 'LineWidth', 1.0);
     ylabel('C_D');
+    ax(2).YAxis(2).Color = [0.2 0.6 0.3];
     grid on;
     title('Coeficientes Aerodinámicos');
 
@@ -147,15 +149,17 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     legend('Thrust', 'Drag', 'Location', 'eastoutside', 'FontSize', 7);
     title('Fuerzas Propulsivas y Resistencia');
 
-    % --- Panel 5: Corriente y Energía ---
+        % --- Panel 5: Corriente y Energía ---
     ax(5) = subplot(n_panels, 1, 5);
     yyaxis left
     plot(log_t, log_current, 'Color', [0.8 0.3 0.1], 'LineWidth', 1.0);
     ylabel('Corriente [A]');
+    ax(5).YAxis(1).Color = [0.8 0.3 0.1];
 
     yyaxis right
     plot(log_t, log_energy, 'Color', [0.5 0.1 0.5], 'LineWidth', 1.2);
     ylabel('Energía [Ah]');
+    ax(5).YAxis(2).Color = [0.5 0.1 0.5];
     grid on;
     title('Consumo Eléctrico');
 
