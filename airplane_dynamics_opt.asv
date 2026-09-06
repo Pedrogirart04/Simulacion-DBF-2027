@@ -1,5 +1,5 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE,AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
@@ -68,11 +68,12 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
     % --- LOGGEO EN LA MATRIZ INFORM ---
     % Agregamos extra.E_wind(1) y extra.E_wind(2) en las filas 25 y 26
     inform = [inform [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3); t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
-                     LIFT_vec(1); LIFT_vec(2); LIFT_vec(3); ...
-                     THRUST_vec(1); THRUST_vec(2); THRUST_vec(3); ...
-                     DRAG_vec(1); DRAG_vec(2); DRAG_vec(3); ...
-                     extra.Corriente_real; ...
-                     extra.E_wind(1); extra.E_wind(2)]]; 
+                 LIFT_vec(1); LIFT_vec(2); LIFT_vec(3); ...
+                 THRUST_vec(1); THRUST_vec(2); THRUST_vec(3); ...
+                 DRAG_vec(1); DRAG_vec(2); DRAG_vec(3); ...
+                 extra.Corriente_real; ...
+                 extra.E_wind(1); extra.E_wind(2); ...
+                 roll_rad]];
 
 
 %% =====================================================================
@@ -148,13 +149,15 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         A = 0.2;
         B = 4;
         Rbat = 0.024;
- 
+        % omega_seed =; Si se quiere poner otra velocidad angular incial
+        % que no sea 300rad/s
+
         % Datos del motor (Scorpion A-5025-310kv, fiteo Kt/Ke/Rint/I0)
         Kt   = 0.0308;   % [Nm/A] constante de torque
         Ke   = 0.0308;   % [V*s/rad] constante de fcem (=Kt en SI)
         Rint = 0.00865;  % [ohm] resistencia interna del bobinado
         I0   = 1.71;     % [A] corriente sin carga
-        Vocv = battery_cntm(E,ncells,Q,E0,K,A,B,Rbat); % Tension de circuito abierto o fuente ideal dependiente del estado de carga
+        Vocv = battery_cntm(E,ncells,Q,E0,K,A,B); % Tension de circuito abierto o fuente ideal dependiente del estado de carga
         
         omega_eq = motor_prop_eq(throttle_real,Vocv,v_normal_helice,PROP_TABLE,Kt,Ke,Rint,...
                                  I0,Rbat,omega_seed); %Resuelvo el equilibrio de torque
@@ -181,11 +184,39 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         cos_r_safe = max(cos_r, 1e-6);
         g = 9.81;
         lift_required = (MTOW * g) / (cos_r_safe * cos_p_safe);
+
         cl = (2 * lift_required) / (ro * v_safe_sq * S_ref);
+        % --- STALL CHECK ---
+        CL_max = 0.62;   % Ajustar según el CLmax real de tu polar
+        if cl > CL_max
+            warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...
+                    cl, CL_max, v_safe, rad2deg(roll_rad));
+            cl = CL_max;   % Recortar a CLmax — el avión no puede generar más
+            cd0 = cd0 + 0.15; %disparamos cd por separacion violenta de flujo
+        end
         [~, Avion_fila] = avion_cl(AVION_TABLE, cl);
+
         cd_total = Avion_fila.c_d + cd0;
         lift = 0.5 * ro * S_ref * cl * v_safe_sq;
         drag = 0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq;
+        
+        thrust_vec = T_total * [ Thrust_N ; 0; 0 ];  
+        drag_vec   = -drag * V_versor;               % Resistencia opuesta al viento relativo
+        
+        % Sustentación en Ejes Viento
+        Y_body_dir = T_total * [0; 1; 0];           % Eje lateral (envergadura)
+        L_dir      = cross(V_versor, Y_body_dir);    % Vector ortogonal
+        L_norm     = norm(L_dir);
+        if L_norm > 1e-6
+            L_dir = L_dir / L_norm;
+        else
+            L_dir = T_total * [0; 0; 1];
+        end
+        lift_vec   = lift * L_dir;                   % Vector de sustentación final
+        
+        % Dinámica aceleración inercial
+        a = [0; 0; -g] + (thrust_vec + lift_vec + drag_vec) / MTOW;
+
         
         % Dinámica aceleración
         a = [0;0;-g] + T_total * [ Thrust_N/MTOW ; 0; lift/MTOW ] - (drag/MTOW) * V_versor;
@@ -211,6 +242,10 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         extra.V_versor = V_versor;
         extra.Corriente_real = Corriente_real;
         extra.E_wind = E_wind; % Pasamos el viento real calculado
+        extra.omega = omega_eq;
+        extra.I_motor = I_motor;
+        extra.I_batt = I_batt;
+        extra.Vocv = Vocv;
     end
 
     function dC = lorenz_derivatives(C_curr)

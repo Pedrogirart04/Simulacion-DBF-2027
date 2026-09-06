@@ -60,17 +60,13 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
     % Registro final de variables
     [~, ~, ~, ~, ~, extra] = compute_derivatives(P, V, Y, C_caos);
 
-    % Componentes de fuerzas
-    THRUST_vec = extra.T_total * [ extra.Thrust_N ; 0; 0 ];
-    LIFT_vec   = extra.T_total * [ 0 ; 0; extra.lift ];
-    DRAG_vec   = -extra.drag * extra.V_versor;
 
     % --- LOGGEO EN LA MATRIZ INFORM ---
     % Agregamos extra.E_wind(1) y extra.E_wind(2) en las filas 25 y 26
     inform = [inform [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3); t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
-                 LIFT_vec(1); LIFT_vec(2); LIFT_vec(3); ...
-                 THRUST_vec(1); THRUST_vec(2); THRUST_vec(3); ...
-                 DRAG_vec(1); DRAG_vec(2); DRAG_vec(3); ...
+                 extra.lift_vec(1); extra.lift_vec(2); extra.lift_vec(3); ...
+                 extra.thrust_vec(1); extra.thrust_vec(2); extra.thrust_vec(3); ...
+                 extra.drag_vec(1); extra.drag_vec(2); extra.drag_vec(3); ...
                  extra.Corriente_real; ...
                  extra.E_wind(1); extra.E_wind(2); ...
                  roll_rad]];
@@ -191,7 +187,8 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         if cl > CL_max
             warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...
                     cl, CL_max, v_safe, rad2deg(roll_rad));
-            %cl = CL_max;   % Recortar a CLmax — el avión no puede generar más
+            cl = CL_max;   % Recortar a CLmax — el avión no puede generar más
+            cd0 = cd0 + 0.15; %disparamos cd por separacion violenta de flujo
         end
         [~, Avion_fila] = avion_cl(AVION_TABLE, cl);
 
@@ -199,8 +196,22 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         lift = 0.5 * ro * S_ref * cl * v_safe_sq;
         drag = 0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq;
         
-        % Dinámica aceleración
-        a = [0;0;-g] + T_total * [ Thrust_N/MTOW ; 0; lift/MTOW ] - (drag/MTOW) * V_versor;
+        thrust_vec = T_total * [ Thrust_N ; 0; 0 ];  
+        drag_vec   = -drag * V_versor;               % Resistencia opuesta al viento relativo
+        
+        % Sustentación en Ejes Viento
+        Y_body_dir = T_total * [0; 1; 0];           % Eje lateral (envergadura)
+        L_dir      = cross(V_versor, Y_body_dir);    % Vector ortogonal
+        L_norm     = norm(L_dir);
+        if L_norm > 1e-6
+            L_dir = L_dir / L_norm;
+        else
+            L_dir = T_total * [0; 0; 1];
+        end
+        lift_vec   = lift * L_dir;                   % Vector de sustentación final
+        
+        % Dinámica aceleración inercial
+        a = [0; 0; -g] + (thrust_vec + lift_vec + drag_vec) / MTOW;
         
         % Rumbo (Yaw)
         vx2_vy2 = V_curr(1)^2 + V_curr(2)^2;
@@ -221,6 +232,9 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         extra.a = a;
         extra.T_total = T_total;
         extra.V_versor = V_versor;
+        extra.thrust_vec = thrust_vec;
+        extra.drag_vec = drag_vec;
+        extra.lift_vec = lift_vec;
         extra.Corriente_real = Corriente_real;
         extra.E_wind = E_wind; % Pasamos el viento real calculado
         extra.omega = omega_eq;
