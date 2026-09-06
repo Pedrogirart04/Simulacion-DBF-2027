@@ -9,7 +9,7 @@ MTOW=8;      %kg Por dios tocar
 ro=1.255;
 S_ref=1.386;
 S=8;
-cd0=0.05;
+cd0=0.05;%Factor de Corrección
 t_n=0.1;
 % --- Banner
 l_Banner=0;
@@ -18,7 +18,7 @@ cd_Banner=0;
 
 
 
-throttle=((1500+(500/1024)*766)+80)
+throttle=((1500+(500/1024)*766)+80);
 prop1="PER3_20x10E.dat";
 v_x=118/3.6;
 
