@@ -149,8 +149,17 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         cos_r_safe = max(cos_r, 1e-6);
         g = 9.81;
         lift_required = (MTOW * g) / (cos_r_safe * cos_p_safe);
+
         cl = (2 * lift_required) / (ro * v_safe_sq * S_ref);
+        % --- STALL CHECK ---
+        CL_max = 0.62;   % Ajustar según el CLmax real de tu polar
+        if cl > CL_max
+            warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...
+                    cl, CL_max, v_safe, rad2deg(roll_rad));
+            %cl = CL_max;   % Recortar a CLmax — el avión no puede generar más
+        end
         [~, Avion_fila] = avion_cl(AVION_TABLE, cl);
+
         cd_total = Avion_fila.c_d + cd0;
         lift = 0.5 * ro * S_ref * cl * v_safe_sq;
         drag = 0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq;

@@ -7,8 +7,8 @@ function T = leer_dat_avion(data_in)
             raw_matrix = readmatrix(data_in, opts);
 
             %ignoro la primera columna (velocidad)
-            cl_data = raw_matrix{:,2};
-            cd_data = raw_matrix{:,3};
+            cl_data = raw_matrix(:,1);
+            cd_data = raw_matrix(:,2);
 
         catch e 
             error ('Error al leer el archivo de polar %s %s', data_in, e.message)
