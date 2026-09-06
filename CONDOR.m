@@ -12,8 +12,8 @@ S=8;
 cd0=0.00815+0.00815;
 t_n=0.02;
 % --- Banner
-S_Banner=
-cd_Banner=0.364
+S_Banner=0.045;
+cd_Banner=0.364;
 % --- Archivos de Datos ---
 prop1="PER3_20x10E.dat";
 motor1='Scorpion A-5025-310kv.dat';
@@ -33,7 +33,6 @@ throttle=1643 ;%1576
 disp('Cargando archivos de datos (una sola vez)...');
 % Usamos las funciones (modificadas) para leer los datos y guardarlos en tablas
 PROP_TABLE = prop(prop1);
-MOTOR_TABLE = motor(motor1);
 AVION_TABLE = avion_cl(plane1);
 disp('Archivos cargados en memoria.');
 
@@ -69,7 +68,7 @@ while sqrt((x-x0)^2+(y-y0)^2)<100
     % --- LLAMADA OPTIMIZADA ---
     % Pasamos las TABLAS (ej: PROP_TABLE) en lugar de los NOMBRES (ej: prop1)
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 pitch_rad=0;
@@ -83,14 +82,14 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
     pitch_rad=0;
     roll_rad=roll_rad+t_n*(-roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 disp("AutoGyro 1b ñeri")
 while abs(yaw_rad - deg2rad(180-13)) > deg2rad(2)
     pitch_rad=0;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 roll_rad_obj=deg2rad(0);
@@ -101,7 +100,7 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
     pitch_rad=0;
     roll_rad=roll_rad+t_n*(-roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 roll_rad=deg2rad(0);
@@ -115,7 +114,7 @@ while sqrt((x-x0)^2+(y-y0)^2)<130
     roll_rad=deg2rad(0);
     yaw_rad=deg2rad(180);
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 
@@ -128,7 +127,7 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
     pitch_rad=0;
     roll_rad=roll_rad-t_n*(roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 disp("AutoGyro 2b ñeri")
@@ -139,7 +138,7 @@ while abs(yaw_rad - deg2rad(360+180-13)) > deg2rad(2) % Corregido de -520 a -140
     
     pitch_rad=0;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 roll_rad_obj=deg2rad(0);
@@ -150,7 +149,7 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
     pitch_rad=0;
     roll_rad=roll_rad+t_n*(-roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 
@@ -162,7 +161,7 @@ while sqrt((x-x0)^2+(y-y0)^2)<90
     pitch_rad=0;
     roll_rad=0;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 
@@ -175,7 +174,7 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
     pitch_rad=0;
     roll_rad=roll_rad+t_n*(-roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 disp("AutoGyro 3b ñeri")
@@ -183,7 +182,7 @@ while abs(yaw_rad - deg2rad(-13+720)) > deg2rad(5)
 
     pitch_rad=0;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 roll_rad_obj=deg2rad(0);
@@ -195,7 +194,7 @@ while  abs(roll_rad - roll_rad_obj) > deg2rad(2)
 
     roll_rad=roll_rad+t_n*(-roll_dif)/t_obj;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 
@@ -206,7 +205,7 @@ while sqrt((x-x0)^2+0*(y-y0)^2)>5
     pitch_rad=0;
     roll_rad=0;
 [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE, AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner);
 end
 

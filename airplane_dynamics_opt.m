@@ -1,5 +1,5 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
-                                                                                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                                                                                          PROP_TABLE,AVION_TABLE, ...
                                                                                           inform,Energy,t,S_Banner,cd_Banner)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
@@ -12,6 +12,11 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
     persistent C_caos;
     if isempty(C_caos)
         C_caos = [1.0; 1.0; 20.0]; 
+    end
+
+    persistent omega_seed;
+    if isempty(omega_seed)
+        omega_seed = 300; % rad/s, valor de arranque genérico, ajustalo si hace falta
     end
 
     % --- PASO 1: k1 ---
@@ -135,14 +140,43 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         F_lorentz_wind = q_air * cross([V_curr(1); V_curr(2); V_curr(3)], B_wind);
         
         % Modelo de Motor y Hélice
-        [~, Motor_datos] = motor(MOTOR_TABLE, throttle); 
-        RPM_actual = Motor_datos.rotation_speed;
-        Prop_fila = interpProp(PROP_TABLE, v_normal_helice, RPM_actual); 
-        Thrust_N = Prop_fila.Thrust_N; 
-        Torque_vuelo = abs(Prop_fila.Torque_Nm); 
+        throttle_real = (throttle - 1225)/(2000-1225); % Cambio el throttle para que el valor sea de 0 a 1
+       % Datos de la bateria 
+        ncells = 8;
+        Q = 3.3;
+        E0 = 4.19;
+        K = 0.02;
+        A = 0.2;
+        B = 4;
+        Rbat = 0.024;
+        % omega_seed =; Si se quiere poner otra velocidad angular incial
+        % que no sea 300rad/s
+
+        % Datos del motor (Scorpion A-5025-310kv, fiteo Kt/Ke/Rint/I0)
+        Kt   = 0.0308;   % [Nm/A] constante de torque
+        Ke   = 0.0308;   % [V*s/rad] constante de fcem (=Kt en SI)
+        Rint = 0.00865;  % [ohm] resistencia interna del bobinado
+        I0   = 1.71;     % [A] corriente sin carga
+        Vocv = battery_cntm(E,ncells,Q,E0,K,A,B); % Tension de circuito abierto o fuente ideal dependiente del estado de carga
         
-        Corriente_real = interp1(MOTOR_TABLE.torque.*MOTOR_TABLE.rotation_speed, MOTOR_TABLE.current, Torque_vuelo* RPM_actual,'linear');
-        Corriente_real = max(Corriente_real, 3.10);
+        omega_eq = motor_prop_eq(throttle_real,Vocv,v_normal_helice,PROP_TABLE,Kt,Ke,Rint,...
+                                 I0,Rbat,omega_seed); %Resuelvo el equilibrio de torque
+        omega_seed = omega_eq; % Actualizo el valor de las RPM
+
+        RPM_actual = omega_eq*60/(2*pi);
+        Prop_fila  = interpProp(PROP_TABLE, v_normal_helice, RPM_actual);
+        Thrust_N   = Prop_fila.Thrust_N;
+        
+         % Corriente de motor (la que circula por Rint) y de batería
+        I_motor = (throttle_real*Vocv - Ke*omega_eq) / ...
+                  (Rint + throttle_real^2*Rbat);
+        I_motor = max(I_motor, 0); % la hélice no puede "motorizar" el motor acá
+        I_batt  = throttle_real * I_motor;
+
+        % Corriente_real se mantiene como corriente de BATERÍA (para SOC/Ah),
+        % que es la que corresponde integrar en dE.
+        Corriente_real = I_batt;
+       
         
         % Aerodinámica
         v_safe_sq = max(v_safe^2, 1e-6);
@@ -176,7 +210,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         % Salidas para RK4
         dP = [V_curr(1); V_curr(2); V_curr(3)];
         dV = a;
-        dE = Corriente_real / 0.8 / 3600;
+        dE = Corriente_real/3600;
         
         % Guardamos datos extras
         extra.cl = cl;
@@ -189,6 +223,10 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         extra.V_versor = V_versor;
         extra.Corriente_real = Corriente_real;
         extra.E_wind = E_wind; % Pasamos el viento real calculado
+        extra.omega = omega_eq;
+        extra.I_motor = I_motor;
+        extra.I_batt = I_batt;
+        extra.Vocv = Vocv;
     end
 
     function dC = lorenz_derivatives(C_curr)
@@ -198,4 +236,45 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
         dC(2) = C_curr(1) * (rho - C_curr(3)) - C_curr(2);
         dC(3) = C_curr(1) * C_curr(2) - beta * C_curr(3);
     end
+end
+
+function Vocv = battery_cntm(Ah_consumidos,ncells,Q,E0,K,A,B)
+
+it = min(max(Ah_consumidos,0), Q*0.999); % Evita Q-it igual a 0 o negativo
+Vocv_cell = E0 - K*(Q/(Q-it))*it + A*exp(-B*it); % Modelo de tensión a lo largo del tiempo
+Vocv = ncells*Vocv_cell; % Tension total
+end
+
+function omega_eq = motor_prop_eq(throttle_real, Vocv, v_air, PROP_TABLE,Kt,Ke,Rint,I0,Rbat,omega_seed)
+
+f = @(w) torque_motor(w,throttle_real,Vocv,Rbat,Kt,Ke,Rint,I0) - prop_torque(w, v_air, PROP_TABLE);
+
+opts = optimset('Display','off','TolX',1e-6);
+    try
+        omega_eq = fzero(f, max(omega_seed, 1), opts);
+        
+    catch
+        % Si fzero no logra acotar la raíz (ej. arranque desde reposo con
+        % semilla mala), probamos con un barrido grueso para darle un
+        % intervalo con cambio de signo antes de tirar la toalla.
+        w_grid = linspace(1, 3000, 60); % rad/s, ajustar rango al tuyo (RPM_max*2*pi/60)
+        f_grid = arrayfun(f, w_grid);
+        idx = find(sign(f_grid(1:end-1)) ~= sign(f_grid(2:end)), 1, 'first');
+        if isempty(idx)
+            omega_eq = 0; % no hay equilibrio con empuje positivo (ESC apagado/trabado)
+        else
+            omega_eq = fzero(f, [w_grid(idx), w_grid(idx+1)], opts);
+        end
+    end
+    omega_eq = max(omega_eq, 0);
+end
+function T = torque_motor(omega,throttle_real,Vocv,Rbat,Kt,Ke,Rint,I0)
+I_motor = (throttle_real*Vocv - Ke*omega)/(Rint + throttle_real^2*Rbat);
+I_motor = max(I_motor, 0);
+T = Kt*(I_motor - I0);
+end
+function T = prop_torque(omega, v_air, PROP_TABLE)
+    RPM = omega * 60/(2*pi);
+    Prop_fila = interpProp(PROP_TABLE, v_air, RPM);
+    T = abs(Prop_fila.Torque_Nm);
 end
