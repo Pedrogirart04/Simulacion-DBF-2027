@@ -63,6 +63,7 @@ addpath(fullfile(repo_root, 'simulador'));
 addpath(fullfile(repo_root, 'datos', 'helices'));
 addpath(fullfile(repo_root, 'datos', 'motores'));
 addpath(fullfile(repo_root, 'datos', 'polares'));
+addpath(fullfile(repo_root, 'analisis_vuelo'));
 repo_root = fileparts(fileparts(mfilename('fullpath')));  % sube de simulador/ a raíz
 
 %Si el archivo es M1 desde misiones/ descomentar la linea de abajo
@@ -343,7 +344,6 @@ for vuelta = 1:n_vueltas
     if mision_abortada; break; end
     roll_rad = 0;
     yaw_rad = heading_base + deg2rad(360);   % Snap heading al valor exacto
-    %VER
     fprintf(' OK (heading = %.1f°)\n', rad2deg(yaw_rad));
 
     % =====================================================================
