@@ -253,14 +253,14 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
 end
 
 function Vocv = battery_cntm(Ah_consumidos,ncells,Q,E0,K,A,B)
-
+%Función Consumo Batería (Disminuye por vuelta la efectividad)
 it = min(max(Ah_consumidos,0), Q*0.999); % Evita Q-it igual a 0 o negativo
 Vocv_cell = E0 - K*(Q/(Q-it))*it + A*exp(-B*it); % Modelo de tensión a lo largo del tiempo
 Vocv = ncells*Vocv_cell; % Tension total
 end
 
 function omega_eq = motor_prop_eq(throttle_real, Vocv, v_air, PROP_TABLE,Kt,Ke,Rint,I0,Rbat,omega_seed)
-
+%Halla el omega correcto que respeta el equilibrio
 f = @(w) torque_motor(w,throttle_real,Vocv,Rbat,Kt,Ke,Rint,I0) - prop_torque(w, v_air, PROP_TABLE);
 
 opts = optimset('Display','off','TolX',1e-6);
