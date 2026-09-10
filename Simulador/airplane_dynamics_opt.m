@@ -1,6 +1,6 @@
-function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
+function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                                                                                           PROP_TABLE, MOTOR_TABLE,AVION_TABLE, ...
-                                                                                          inform,Energy,t,S_Banner,cd_Banner)
+                                                                                          Energy,t,S_Banner,cd_Banner)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
     P = [x; y; z];
@@ -20,7 +20,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
     end
 
     % --- PASO 1: k1 ---
-    [dP1, dV1, dY1, dE1, dC1, ~] = compute_derivatives(P, V, Y, C_caos);
+   [dP1, dV1, dY1, dE1, dC1, extra] = compute_derivatives(P, V, Y, C_caos);
 
     % --- PASO 2: k2 ---
     P2 = P + 0.5 * t_n * dP1;
@@ -57,19 +57,19 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = airpla
     Energy = E;
     t = t + t_n;
 
-    % Registro final de variables
-    [~, ~, ~, ~, ~, extra] = compute_derivatives(P, V, Y, C_caos);
+    % Registro final de variables (+ Costo Computo Innecesario)
+    %[~, ~, ~, ~, ~, extra] = compute_derivatives(P, V, Y, C_caos);
 
 
     % --- LOGGEO EN LA MATRIZ INFORM ---
     % Agregamos extra.E_wind(1) y extra.E_wind(2) en las filas 25 y 26
-    inform = [inform [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3); t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
+    log_step = [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3); t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
                  extra.lift_vec(1); extra.lift_vec(2); extra.lift_vec(3); ...
                  extra.thrust_vec(1); extra.thrust_vec(2); extra.thrust_vec(3); ...
                  extra.drag_vec(1); extra.drag_vec(2); extra.drag_vec(3); ...
                  extra.Corriente_real; ...
                  extra.E_wind(1); extra.E_wind(2); ...
-                 roll_rad]];
+                 roll_rad];
 
 
 %% =====================================================================

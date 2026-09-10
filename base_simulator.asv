@@ -26,7 +26,7 @@ V_inicio = 20;           % [m/s]   Velocidad inicial (arranque ya en vuelo)
 throttle = 1643;         % [μs]    Señal PWM al ESC (fijo por ahora)
 
 % --- Circuito de vuelo ---
-n_vueltas    = 1;                % Cantidad de vueltas a simular
+n_vueltas    = 3;                % Cantidad de vueltas a simular
 largo_pierna = [100, 130];       % [m] Largo de pierna 1 y pierna 2
 bank_angle   = 60;               % [°] Bank angle en los giros (positivo)
 t_transicion = 1.0;              % [s] Tiempo para rolear de 0° a bank
@@ -38,7 +38,7 @@ S_Banner  = 0;           % [m²] Superficie del banner
 cd_Banner = 0;           % [-]  CD del banner
 
 % --- Simulación ---
-dt       = 0.1;         % [s] Paso de tiempo del integrador
+dt       = 0.02;         % [s] Paso de tiempo del integrador
 t_max    = 300;          % [s] Tiempo máximo de misión (5 min)
 
 % --- Scoring (ajustar según misión) ---
@@ -93,8 +93,7 @@ fprintf('Datos cargados.\n\n');
 %  SECCIÓN 3: CONDICIONES INICIALES
 %  ========================================================================
 
-% --- Log de datos ---
-% Cada columna de inform es un instante de tiempo.
+% CÓDIGO NUEVO (Reemplazar inform = [];)
 max_pasos = ceil(t_max / dt) + 100;
 inform = zeros(27, max_pasos);
 step_idx = 0;
@@ -109,6 +108,11 @@ yaw_rad   = 0;
 
 % --- Energía ---
 Energy = 0;          % [Ah] consumidos (acumulador)
+
+% --- Log de datos ---
+% Cada columna de inform es un instante de tiempo.
+% Las filas son las variables logueadas por airplane_dynamics_opt.
+inform = [];
 
 % --- Contadores de misión ---
 vueltas_completadas = 0;
@@ -181,6 +185,9 @@ for vuelta = 1:n_vueltas
                 Energy, t, S_Banner, cd_Banner);
 
         inform(:, step_idx) = log_step;
+
+
+
 
     end
     if mision_abortada; break; end
@@ -283,16 +290,12 @@ for vuelta = 1:n_vueltas
         pitch_rad = 0;
         roll_rad  = 0;
 
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
+        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = ...
             airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
                 x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
                 throttle, cd0, ...
                 PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
+                inform, Energy, t, S_Banner, cd_Banner);
     end
     if mision_abortada; break; end
     fprintf(' OK (%.1f m)\n', sqrt((x-x0)^2+(y-y0)^2));
@@ -318,16 +321,12 @@ for vuelta = 1:n_vueltas
             roll_rad = min(roll_rad, roll_objetivo);
         end
 
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
+        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = ...
             airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
                 x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
                 throttle, cd0, ...
                 PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
+                inform, Energy, t, S_Banner, cd_Banner);
     end
     if mision_abortada; break; end
 
@@ -336,16 +335,12 @@ for vuelta = 1:n_vueltas
         if t >= t_max; mision_abortada = true; break; end
         pitch_rad = 0;
 
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
+        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = ...
             airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
                 x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
                 throttle, cd0, ...
                 PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
+                inform, Energy, t, S_Banner, cd_Banner);
     end
     if mision_abortada; break; end
 
@@ -362,16 +357,12 @@ for vuelta = 1:n_vueltas
             roll_rad = max(roll_rad, 0);
         end
 
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
+        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,inform,Energy,t] = ...
             airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
                 x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
                 throttle, cd0, ...
                 PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
+                inform, Energy, t, S_Banner, cd_Banner);
     end
     if mision_abortada; break; end
     roll_rad = 0;
@@ -405,7 +396,7 @@ if vueltas_completadas > 0
 end
 fprintf('\n');
 
-inform = inform(:, 1:step_idx);
+
 
 %% ========================================================================
 %  SECCIÓN 6: RESULTADOS Y SCORING
@@ -526,10 +517,7 @@ switch scoring_type
         warning('scoring_type "%s" no reconocido. Opciones: none, M1, M2, M3', scoring_type);
 end
 
-disp("----- \n")
-disp("Tiempo de Simulacion \n")
-toc
-disp("----- \n")
+
 %% ========================================================================
 %  SECCIÓN 7: GRÁFICOS
 %  ========================================================================
@@ -537,3 +525,4 @@ disp("----- \n")
 plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                 MTOW, rho, S_ref, CL_max, t);
 
+toc
