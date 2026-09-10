@@ -25,12 +25,28 @@ rho      = 1.225;        % [kg/m³] Densidad del aire (ISA nivel del mar)
 V_inicio = 20;           % [m/s]   Velocidad inicial (arranque ya en vuelo)
 throttle = 1643;         % [μs]    Señal PWM al ESC (fijo por ahora)
 
-% --- Circuito de vuelo ---
-n_vueltas    = 1;                % Cantidad de vueltas a simular
-largo_pierna = [100, 130];       % [m] Largo de pierna 1 y pierna 2
-bank_angle   = 60;               % [°] Bank angle en los giros (positivo)
-t_transicion = 1.0;              % [s] Tiempo para rolear de 0° a bank
-heading_offset = 13;             % [°] 13° Corrección empírica de overshoot en giro
+% =========================================================================
+% SECCIÓN : PARAMETRIZACIÓN DE LA MISIÓN / CIRCUITO
+
+n_vueltas      = 3;     % Cantidad de vueltas a simular
+t_transicion   = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
+heading_offset = 13.0;  % [°] Corrección empírica de overshoot
+
+circuito = [
+    % --- TRAMO 1: Recta Principal ---
+    struct('tipo', 'recta', 'largo_m', 200, 'bank_deg', 0,   'throttle', 1800)
+    % --- TRAMO 2: Giro 180° a la izquierda ---
+    struct('tipo', 'giro',  'delta_yaw_deg', 180, 'bank_deg', 30, 'throttle', 1800)
+    % --- TRAMO 3: Recta Opuesta ---
+    struct('tipo', 'recta', 'largo_m', 200, 'bank_deg', 0,   'throttle', 1800)
+    % --- TRAMO 4: Giro 180° a la izquierda ---
+    struct('tipo', 'giro',  'delta_yaw_deg', 180, 'bank_deg', 30, 'throttle', 1800)
+];
+
+% Estado inicial de la velocidad angular del motor (~2860 RPM)
+omega = 300; % [rad/s]
+
+%==========================================================================
 
 % --- Hecho para Banner, Modificable para sensor ---
 % --- Banner (poner 0 si no hay) ---
@@ -94,8 +110,8 @@ fprintf('Datos cargados.\n\n');
 %  ========================================================================
 
 % --- Log de datos ---
-% Cada columna de inform es un instante de tiempo.
-max_pasos = ceil(t_max / dt) + 100;
+t_max_est = 600; % Estimación de tiempo máximo de vuelo [s]
+max_pasos = ceil(t_max_est / dt) + 2000;
 inform = zeros(27, max_pasos);
 step_idx = 0;
 
@@ -141,270 +157,82 @@ fprintf('dt = %.3f s | t_max = %.0f s\n\n', dt, t_max);
 fprintf('Despegue: SALTADO (arranca en vuelo a %.1f m/s)\n\n', V_inicio);
 
 
-%% ========================================================================
-%  SECCIÓN 5: LOOP PRINCIPAL DE VUELTAS
-%  ========================================================================
+% =========================================================================
+% SECCIÓN 5: BUCLE PRINCIPAL DE NAVEGACIÓN (UNIFIED STATE MACHINE)
+% =========================================================================
 
 for vuelta = 1:n_vueltas
-
-    t_inicio_vuelta = t;
-    fprintf('--- Vuelta %d/%d (t = %.1f s) ---\n', vuelta, n_vueltas, t);
-
-    % Heading acumulado base para esta vuelta
-    heading_base = (vuelta - 1) * 2 * pi;
-
-    % =====================================================================
-    %  PIERNA 1 (ida)
-    % =====================================================================
-    x0 = x;  y0 = y;
-    fprintf('  Pierna 1...');
-    while sqrt((x - x0)^2 + (y - y0)^2) < largo_pierna(1) 
-    % Cuando L_recorrido = sqrt(deltaX^2 + deltaY^2) < L_a_recorrer sigue el loop 
-
-        % Chequeo de tiempo límite
-        if t >= t_max
-            mision_abortada = true;
-            fprintf(' TIEMPO LÍMITE\n');
-            break;
-        end
-
-        pitch_rad = 0;
-        roll_rad  = 0;
+    for t_idx = 1:length(circuito)
         
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
+        tramo = circuito(t_idx);
+        throttle = tramo.throttle;
+        
+        % Registro de punto inicial del tramo
+        x_start = x; 
+        y_start = y;
+        yaw_acum = 0;
+        
+        en_tramo = true;
+        
+        while en_tramo
+            yaw_prev = yaw_rad;
+            
+            % --- 1. CÁLCULO DEL ALABEO(YAW) OBJETIVO Y TASA MÁXIMA DE ROLIDO ---
+            if strcmp(tramo.tipo, 'recta')
+                target_bank = 0;
+            elseif strcmp(tramo.tipo, 'giro')
+                target_bank = sign(tramo.delta_yaw_deg) * abs(deg2rad(tramo.bank_deg));
+            end
+            
+            % Tasa de alabeo maxima permitida por segundo [rad/s]
+            % Asumimos referencia relativa al bank maximo parametrizado
+            max_roll_rate = max(abs(target_bank), deg2rad(30)) / t_transicion;
+            
+            % --- 2. APLICACIÓN DE RAMPA SUAVE (Entrada y Salida de Giros) ---
+            d_roll = target_bank - roll_rad;
+            roll_rad = roll_rad + sign(d_roll) * min(abs(d_roll), max_roll_rate * dt);
+            
+            % --- 3. EVALUAR CONDICIONES DE FIN DE TRAMO ---
+            if strcmp(tramo.tipo, 'recta')
+                dist_recorrida = norm([x - x_start, y - y_start]);
+                if dist_recorrida >= tramo.largo_m
+                    en_tramo = false;
+                    break;
+                end
+                
+            elseif strcmp(tramo.tipo, 'giro')
+                % Condición con offset para iniciar el des-alabeo a tiempo
+                target_yaw_rad = abs(deg2rad(tramo.delta_yaw_deg)) - deg2rad(heading_offset);
+                if yaw_acum >= target_yaw_rad
+                    en_tramo = false;
+                    break;
+                end
+            end
+            
+            % --- 4. INTEGRACIÓN FÍSICA Y DINÁMICA DEL MOTOR (RK4) ---
+            step_idx = step_idx + 1;
+            
+            [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, omega, log_step, Energy, t] = ...
+                airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
+                    x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, omega, ...
+                    throttle, cd0, ...
+                    PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
+                    Energy, t, S_Banner, cd_Banner);
+                
+            % --- 5. ALMACENAMIENTO EN LOG PREASIGNADO ---
+            inform(:, step_idx) = log_step;
+            
+            % --- 6. CÁLCULO DE ÁNGULO GIRADO ACUMULADO ---
+            dyaw = yaw_rad - yaw_prev;
+            if dyaw > pi,  dyaw = dyaw - 2*pi; end
+            if dyaw < -pi, dyaw = dyaw + 2*pi; end
+            yaw_acum = yaw_acum + abs(dyaw);
+            
+        end % while en_tramo
+    end % for tramo
+end % for vuelta
 
-        inform(:, step_idx) = log_step;
-
-    end
-    if mision_abortada; break; end
-    fprintf(' OK (%.1f m)\n', sqrt((x-x0)^2+(y-y0)^2));
-
-    % =====================================================================
-    %  GIRO 1 (180°)
-    % =====================================================================
-    heading_target = heading_base + heading_giro1;
-    fprintf('  Giro 1...');
-
-    % --- Fase A: Rolear hasta bank objetivo ---
-    roll_objetivo  = -bank_rad;     % Negativo = giro a izquierda
-    roll_rate = roll_objetivo / t_transicion;   % [rad/s]
-
-    while abs(roll_rad - roll_objetivo) > deg2rad(2)
-    %Hasta que Roll difiera del objetivo menos de 2 grados   
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-        roll_rad  = roll_rad + dt * roll_rate;
-
-        % Clamp para no pasarse
-        if roll_rate < 0
-            roll_rad = max(roll_rad, roll_objetivo);
-        else
-            roll_rad = min(roll_rad, roll_objetivo);
-        end
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-
-    % --- Fase B: Mantener bank hasta alcanzar heading ---
-    while abs(yaw_rad - heading_target) > deg2rad(2)
-    %Hasta que Yaw difiera del objetivo menos de 2 grados 
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-
-    % --- Fase C: Nivelar (volver a roll = 0) ---
-    roll_rate_nivelar = -roll_objetivo / t_transicion;  % signo opuesto
-
-    while abs(roll_rad) > deg2rad(2)
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-        roll_rad  = roll_rad + dt * roll_rate_nivelar;
-
-        % Clamp para no pasarse de 0
-        if roll_rate_nivelar > 0
-            roll_rad = min(roll_rad, 0);
-        else
-            roll_rad = max(roll_rad, 0);
-        end
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-    roll_rad = 0;
-    yaw_rad = heading_base + deg2rad(180);   % Snap heading al valor exacto
-    fprintf(' OK (heading = %.1f°)\n', rad2deg(yaw_rad));
-
-    % =====================================================================
-    %  PIERNA 2 (vuelta)
-    % =====================================================================
-    x0 = x;  y0 = y;
-    fprintf('  Pierna 2...');
-
-    while sqrt((x - x0)^2 + (y - y0)^2) < largo_pierna(2)
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-        roll_rad  = 0;
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-    fprintf(' OK (%.1f m)\n', sqrt((x-x0)^2+(y-y0)^2));
-    
-
-        % =====================================================================
-    %  GIRO 2 (180°, vuelve al heading original)
-    % =====================================================================
-    heading_target = heading_base + heading_giro2;
-    fprintf('  Giro 2...');
-
-    % --- Fase A: Rolear ---
-    roll_objetivo  = -bank_rad;
-    roll_rate = roll_objetivo / t_transicion;
-
-    while abs(roll_rad - roll_objetivo) > deg2rad(2)
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-        roll_rad  = roll_rad + dt * roll_rate;
-        if roll_rate < 0
-            roll_rad = max(roll_rad, roll_objetivo);
-        else
-            roll_rad = min(roll_rad, roll_objetivo);
-        end
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-
-    % --- Fase B: Mantener bank ---
-    while abs(yaw_rad - heading_target) > deg2rad(2)
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-
-    % --- Fase C: Nivelar ---
-    roll_rate_nivelar = -roll_objetivo / t_transicion;
-
-    while abs(roll_rad) > deg2rad(2)
-        if t >= t_max; mision_abortada = true; break; end
-        pitch_rad = 0;
-        roll_rad  = roll_rad + dt * roll_rate_nivelar;
-        if roll_rate_nivelar > 0
-            roll_rad = min(roll_rad, 0);
-        else
-            roll_rad = max(roll_rad, 0);
-        end
-
-        %Cinematica/Dinamica en t, Datos t (Input)-->Datos t+1 (Output)
-        step_idx = step_idx + 1;
-        [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy,t] = ...
-            airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                throttle, cd0, ...
-                PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                Energy, t, S_Banner, cd_Banner);
-
-        inform(:, step_idx) = log_step;
-    end
-    if mision_abortada; break; end
-    roll_rad = 0;
-    yaw_rad = heading_base + deg2rad(360);   % Snap heading al valor exacto
-    %VER
-    fprintf(' OK (heading = %.1f°)\n', rad2deg(yaw_rad));
-
-    % =====================================================================
-    %  FIN DE VUELTA
-    % =====================================================================
-    t_por_vuelta(vuelta) = t - t_inicio_vuelta;
-    vueltas_completadas = vuelta;
-
-    fprintf('  Vuelta %d completada en %.2f s (E = %.3f Ah)\n\n', ...
-            vuelta, t_por_vuelta(vuelta), Energy);
-end
-
-% Resumen post-loop
-fprintf('=== SIMULACIÓN TERMINADA ===\n');
-if mision_abortada
-    fprintf('Misión abortada: ');
-    if t >= t_max
-        fprintf('tiempo límite alcanzado (%.0f s)\n', t_max);
-    end
-end
-fprintf('Vueltas completadas: %d/%d\n', vueltas_completadas, n_vueltas);
-fprintf('Tiempo total: %.2f s\n', t);
-fprintf('Energía total: %.3f Ah\n', Energy);
-if vueltas_completadas > 0
-    fprintf('Tiempo promedio por vuelta: %.2f s\n', mean(t_por_vuelta(1:vueltas_completadas)));
-end
-fprintf('\n');
-
+% Recorte final de la matriz de datos al número exacto de pasos
 inform = inform(:, 1:step_idx);
 
 %% ========================================================================
