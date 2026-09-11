@@ -48,6 +48,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
 
     log_x       = inform(1, :);
     log_y       = inform(2, :);
+    log_z       = inform(3, :);
     log_vx      = inform(4, :);
     log_vy      = inform(5, :);
     log_vz      = inform(6, :);
@@ -77,17 +78,19 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     end
 
     % =====================================================================
-    %  FIGURA 1: TRAYECTORIA X-Y
+    %  FIGURA 1: TRAYECTORIAS 2D Y 3D
     % =====================================================================
-    figure('Name', 'Trayectoria', 'NumberTitle', 'off', ...
-           'Units', 'normalized', 'Position', [0.02 0.25 0.4 0.55]);
+    figure('Name', 'Trayectorias de Vuelo', 'NumberTitle', 'off', ...
+           'Units', 'normalized', 'Position', [0.02 0.25 0.50 0.55]);
 
+    % --- SUBPLOT 1: Vista Superior 2D (Planta) ---
+    subplot(1, 2, 1);
     plot(log_y, log_x, 'b-', 'LineWidth', 1.5);
     hold on; grid on; axis equal;
 
-    % Inicio y fin
-    plot(log_y(1), log_x(1), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g');
-    plot(log_y(end), log_x(end), 'rs', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
+    % Puntos Inicio y Fin
+    plot(log_y(1), log_x(1), 'go', 'MarkerSize', 9, 'MarkerFaceColor', 'g');
+    plot(log_y(end), log_x(end), 'rs', 'MarkerSize', 9, 'MarkerFaceColor', 'r');
 
     % Flecha de dirección inicial
     quiver(log_y(1), log_x(1), log_vy(1)*2, log_vx(1)*2, ...
@@ -95,8 +98,30 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
 
     xlabel('y [m] (lateral)');
     ylabel('x [m] (avance)');
-    title(sprintf('Trayectoria — %d vueltas, %.1f s', vueltas_completadas, t_total));
+    title(sprintf('Vista 2D (Planta) — %d vueltas', vueltas_completadas));
     legend('Trayectoria', 'Inicio', 'Fin', 'Location', 'best');
+    hold off;
+
+    % --- SUBPLOT 2: Vista Espacial 3D ---
+    subplot(1, 2, 2);
+    plot3(log_y, log_x, log_z, 'b-', 'LineWidth', 1.5);
+    hold on; grid on; axis equal;
+
+    % Puntos Inicio y Fin 3D
+    plot3(log_y(1), log_x(1), log_z(1), 'go', 'MarkerSize', 9, 'MarkerFaceColor', 'g');
+    plot3(log_y(end), log_x(end), log_z(end), 'rs', 'MarkerSize', 9, 'MarkerFaceColor', 'r');
+
+    % Sombra / Proyección en el suelo (Z = 0)
+    plot3(log_y, log_x, zeros(size(log_z)), 'Color', [0.7 0.7 0.7], ...
+          'LineStyle', '--', 'LineWidth', 0.8);
+
+    xlabel('y [m] (lateral)');
+    ylabel('x [m] (avance)');
+    zlabel('z [m] (altitud)');
+    title('Trayectoria 3D');
+    legend('Trayectoria 3D', 'Inicio', 'Fin', 'Proyección Suelo', 'Location', 'best');
+    
+    view(45, 30); % Ángulo de cámara 3D (Azimuth 45°, Elevación 30°)
     hold off;
 
     % =====================================================================

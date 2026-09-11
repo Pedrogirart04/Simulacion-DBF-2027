@@ -26,27 +26,42 @@ V_inicio = 20;           % [m/s]   Velocidad inicial (arranque ya en vuelo)
 throttle = 1643;         % [μs]    Señal PWM al ESC (fijo por ahora)
 
 % =========================================================================
-% SECCIÓN : PARAMETRIZACIÓN DE LA MISIÓN / CIRCUITO
+% CIRCUITO Y MISIÓN (INDIVIDUAL POR TRAMO)
 
-n_vueltas      = 3;     % Cantidad de vueltas a simular
-t_transicion   = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
-heading_offset = 13.0;  % [°] Corrección empírica de overshoot
+%Elapsed time 53.613225 seconds, 0.352Ah 37sec
+
+n_vueltas    = 1;     % Cantidad de vueltas
+t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
 
 circuito = [
-    % --- TRAMO 1: Recta Principal ---
-    struct('tipo', 'recta', 'largo_m', 200, 'bank_deg', 0,   'throttle', 1800)
-    % --- TRAMO 2: Giro 180° a la izquierda ---
-    struct('tipo', 'giro',  'delta_yaw_deg', 180, 'bank_deg', 30, 'throttle', 1800)
-    % --- TRAMO 3: Recta Opuesta ---
-    struct('tipo', 'recta', 'largo_m', 200, 'bank_deg', 0,   'throttle', 1800)
-    % --- TRAMO 4: Giro 180° a la izquierda ---
-    struct('tipo', 'giro',  'delta_yaw_deg', 180, 'bank_deg', 30, 'throttle', 1800)
+    % --- TRAMO 1: Recta ---
+    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
+
+    % --- TRAMO 2: Giro 
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13), ...
+
+    % --- TRAMO 3: Recta ---
+    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
+
+    % --- TRAMO 4: Giro 
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13), ...
+
+    % --- TRAMO 5: Recta ---
+    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
+
+    % --- TRAMO 6: Giro 360
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13), ...
+
+    % --- TRAMO 6: Recta
+    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
 ];
 
-% Estado inicial de la velocidad angular del motor (~2860 RPM)
+% Estado inicial de la velocidad angular del motor
 omega = 300; % [rad/s]
 
-%==========================================================================
+% Ángulo de alabeo máximo para referencia
+bank_angle = max([circuito.bank_deg]);
+% =========================================================================
 
 % --- Hecho para Banner, Modificable para sensor ---
 % --- Banner (poner 0 si no hay) ---
@@ -136,17 +151,13 @@ mision_abortada = false; %Por si se quiere abortar la misión
 % Convertir ángulos a radianes una sola vez
 bank_rad = deg2rad(bank_angle);
 
-% Heading objetivos para cada giro (acumulativos, sin wrap)
-% Giro 1: de 0° a 180° (media vuelta)
-% Giro 2: de 180° a 360° (otra media vuelta, cierra la vuelta)
-heading_giro1 = deg2rad(180 - heading_offset);
-heading_giro2 = deg2rad(360 - heading_offset);
-% Para vueltas subsiguientes se suman 360° por vuelta
 
 fprintf('=== INICIO DE SIMULACIÓN ===\n');
 fprintf('MTOW = %.1f kg | V_ini = %.1f m/s | Bank = %.0f°\n', MTOW, V_inicio, bank_angle);
+% Extrae las rectas configuradas en el circuito
+rectas = circuito(strcmp({circuito.tipo}, 'recta'));
 fprintf('Circuito: piernas de %d y %d m | %d vueltas objetivo\n', ...
-        largo_pierna(1), largo_pierna(2), n_vueltas);
+        rectas(1).largo_m, rectas(2).largo_m, n_vueltas);
 fprintf('dt = %.3f s | t_max = %.0f s\n\n', dt, t_max);
 
 
@@ -171,6 +182,15 @@ for vuelta = 1:n_vueltas
         x_start = x; 
         y_start = y;
         yaw_acum = 0;
+        
+        % --- IMPRIMIR PROGRESO EN CONSOLA ---
+        if strcmp(tramo.tipo, 'recta')
+            fprintf('Vuelta %d/%d | Tramo %d: RECTA (%d m)\n', ...
+                vuelta, n_vueltas, t_idx, tramo.largo_m);
+        elseif strcmp(tramo.tipo, 'giro')
+            fprintf('Vuelta %d/%d | Tramo %d: GIRO (%d° a bank %d°)\n', ...
+                vuelta, n_vueltas, t_idx, tramo.delta_yaw_deg, tramo.bank_deg);
+        end
         
         en_tramo = true;
         
@@ -202,19 +222,19 @@ for vuelta = 1:n_vueltas
                 
             elseif strcmp(tramo.tipo, 'giro')
                 % Condición con offset para iniciar el des-alabeo a tiempo
-                target_yaw_rad = abs(deg2rad(tramo.delta_yaw_deg)) - deg2rad(heading_offset);
+                target_yaw_rad = abs(deg2rad(tramo.delta_yaw_deg)) - deg2rad(tramo.heading_offset);
                 if yaw_acum >= target_yaw_rad
                     en_tramo = false;
                     break;
                 end
             end
             
-            % --- 4. INTEGRACIÓN FÍSICA Y DINÁMICA DEL MOTOR (RK4) ---
+           % --- 4. INTEGRACIÓN FÍSICA Y DINÁMICA (FIRMA ACTUAL SIN OMEGA) ---
             step_idx = step_idx + 1;
             
-            [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, omega, log_step, Energy, t] = ...
+            [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy, t] = ...
                 airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
-                    x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, omega, ...
+                    x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
                     throttle, cd0, ...
                     PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
                     Energy, t, S_Banner, cd_Banner);
