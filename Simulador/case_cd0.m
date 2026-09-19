@@ -1,5 +1,5 @@
-function cd0_actual = case_cd0(fase, dt, V, CD0_TAKEOFF_TABLE)
-    cd0_base   = 0.016; % Sin sensor / crucero
+function cd0_actual = case_cd0(fase, dt, V, CD0_TAKEOFF_TABLE, cd0_base)
+    %cd0_base   = 0.016; % Sin sensor / crucero
     cd0_sensor = 0.035; % Sensor 100% afuera
 
     switch fase

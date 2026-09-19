@@ -1,9 +1,11 @@
-%% base_simulator.m
-% Simulador base DBF — Aero ITBA 2027
-% Copiar este archivo y renombrar para cada misión (ej: Sim_M1.m)
+% --- ANTES ---
+% clc; clear; close all;
 
-clc; clear; close all;
-tic
+% --- AHORA (Línea 1) ---
+function [inform, t_total, Energy, cpu_time] = base_simulator(MTOW_custom, do_plot)
+if nargin < 1, MTOW_custom = 8; end   % Valor por defecto si no le pasás masa
+if nargin < 2, do_plot = false; end    % Por defecto no abre gráficos
+
 %% ========================================================================
 %  SECCIÓN 1: CONFIGURACIÓN DE MISIÓN
 %  ========================================================================
@@ -35,25 +37,25 @@ t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
 
 circuito = [
     % --- TRAMO 1: Recta ---
-    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
 
     % --- TRAMO 2: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0), ...
 
     % --- TRAMO 3: Recta ---
-    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
 
     % --- TRAMO 4: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0), ...
 
     % --- TRAMO 5: Recta ---
-    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
 
     % --- TRAMO 6: Giro 360
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13), ...
 
     % --- TRAMO 6: Recta
-    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0), ...
 ];
 
 % Estado inicial de la velocidad angular del motor
@@ -183,8 +185,6 @@ for vuelta = 1:n_vueltas
         y_start = y;
         yaw_acum = 0;
         
-        t_inicio_pierna = t;
-
         % --- IMPRIMIR PROGRESO EN CONSOLA ---
         if strcmp(tramo.tipo, 'recta')
             fprintf('Vuelta %d/%d | Tramo %d: RECTA (%d m)\n', ...
@@ -231,19 +231,15 @@ for vuelta = 1:n_vueltas
                 end
             end
             
-            dt_pierna = t - t_inicio_pierna;
-            V_inst = sqrt(v_x^2 + v_y^2 + v_z^2);
-            cd0_actual = case_cd0(tramo.fase_cd0, dt_pierna, V_inst, [], cd0);
-
            % --- 4. INTEGRACIÓN FÍSICA Y DINÁMICA (FIRMA ACTUAL SIN OMEGA) ---
             step_idx = step_idx + 1;
             
             [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad, log_step, Energy, t] = ...
                 airplane_dynamics_opt(MTOW, dt, rho, S_ref, ...
                     x, y, z, v_x, v_y, v_z, roll_rad, pitch_rad, yaw_rad, ...
-                    throttle, cd0_actual, ...
+                    throttle, cd0, ...
                     PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
-                    Energy, t, S_Banner, cd_Banner,CL_max);
+                    Energy, t, S_Banner, cd_Banner);
                 
             % --- 5. ALMACENAMIENTO EN LOG PREASIGNADO ---
             inform(:, step_idx) = log_step;
@@ -387,7 +383,12 @@ disp("----- \n")
 %% ========================================================================
 %  SECCIÓN 7: GRÁFICOS
 %  ========================================================================
+% --- AL FINAL DEL ARCHIVO ---
+cpu_time = toc; % Detiene el cronómetro de CPU
 
+if do_plot
+    plot_simulation(inform, t_por_vuelta, vueltas_completadas, MTOW, rho, S_ref, CL_max, t_total);
+end
 plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                 MTOW, rho, S_ref, CL_max, t);
 

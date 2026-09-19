@@ -1,8 +1,12 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                                                                                           PROP_TABLE, MOTOR_TABLE,AVION_TABLE, ...
-                                                                                          Energy,t,S_Banner,cd_Banner)
+                                                                                          Energy,t,S_Banner,cd_Banner,CL_max)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
+    if nargin < 23 || isempty(CL_max)
+        CL_max = 0.62;  % valor legacy, se usa si no se pasa (compatibilidad con Legacy/CONDOR_M1.m)
+    end
+
     P = [x; y; z];
     V = [v_x; v_y; v_z];
     Y = yaw_rad;
@@ -80,7 +84,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         % -----------------------------------------------------------------
         % CONTROL DE VIENTO: Elegí entre: 'caotico', 'constante' o 'desactivado'
         % -----------------------------------------------------------------
-        modo_viento = 'constante'; 
+        modo_viento = 'desactivado'; 
         
         switch modo_viento
             case 'caotico'
@@ -183,7 +187,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
 
         cl = (2 * lift_required) / (ro * v_safe_sq * S_ref);
         % --- STALL CHECK ---
-        CL_max = 0.62;   % Ajustar según el CLmax real de tu polar
+
         if cl > CL_max
             warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...
                     cl, CL_max, v_safe, rad2deg(roll_rad));
