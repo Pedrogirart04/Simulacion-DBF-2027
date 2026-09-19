@@ -33,6 +33,9 @@ MOTOR_TABLE = leer_dat_mot(motor_file);
 MOTOR_TABLE.torque = abs(MOTOR_TABLE.torque);
 AVION_TABLE = leer_dat_avion(polar_file);
 
+fprintf('V_ms rango tabla: %.1f a %.1f m/s\n', min(PROP_TABLE.V_ms), max(PROP_TABLE.V_ms));
+fprintf('RPM rango tabla:  %.0f a %.0f\n', min(PROP_TABLE.RPM), max(PROP_TABLE.RPM));
+
 n_pasos = round(t_max/dt);
 
 escenarios = struct('nombre', {'Recta (crucero)', 'Viraje 60 grados'}, 'roll_deg', {0, 60});
@@ -62,13 +65,16 @@ for e = 1:numel(escenarios)
     x=0;y=0;z=0; v_x=V_inicial;v_y=0;v_z=0;
     roll_rad=deg2rad(esc.roll_deg); pitch_rad=0; yaw_rad=0;
     Energy_new=0; t=0;
-    inform_new = zeros(27, n_pasos);
+    inform_new = zeros(28, n_pasos);
     for k = 1:n_pasos
         [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy_new,t] = ...
             airplane_dynamics_opt(MTOW,dt,rho,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                 PROP_TABLE, MOTOR_TABLE, AVION_TABLE, Energy_new, t, S_Banner, cd_Banner);
         inform_new(:,k) = log_step;
     end
+
+    RPM_new = inform_new(28,end)*60/(2*pi);
+    RPM_old = Motor_row.rotation_speed;  % ya la tenés disponible, mismo truco que I_old
     V_new = sqrt(v_x^2+v_y^2+v_z^2);
     CL_new = inform_new(11,end);
     Thrust_new = inform_new(14,end);
@@ -76,11 +82,12 @@ for e = 1:numel(escenarios)
     I_new_peak  = max(inform_new(24,:));
 
     % ---------- Reporte ----------
-    fprintf('VIEJO -> V=%.2f m/s | CL=%.3f | Thrust=%.1f N | I=%.1f A (cte, no depende del vuelo) | Energy=%.4f Ah\n', ...
-        V_old, CL_old, Thrust_old, I_old, Energy_old);
-    fprintf('NUEVO -> V=%.2f m/s | CL=%.3f | Thrust=%.1f N | I_final=%.1f A | I_pico=%.1f A | Energy=%.4f Ah\n', ...
-        V_new, CL_new, Thrust_new, I_new_final, I_new_peak, Energy_new);
+    fprintf('VIEJO -> V=%.2f m/s | CL=%.3f | Thrust=%.1f N | I=%.1f A (cte, no depende del vuelo) | Energy=%.4f Ah\n |RPM=%.1f \n', ...
+        V_old, CL_old, Thrust_old, I_old, Energy_old,RPM_old);
+    fprintf('NUEVO -> V=%.2f m/s | CL=%.3f | Thrust=%.1f N | I_final=%.1f A | I_pico=%.1f A | Energy=%.4f Ah\n |RPM=%.1f \n', ...
+        V_new, CL_new, Thrust_new, I_new_final, I_new_peak, Energy_new,RPM_new);
     fprintf('Delta V: %+.1f %% | Delta CL: %+.1f %% | Delta Thrust: %+.1f %% | Delta Energy: %+.1f %%\n', ...
         100*(V_new-V_old)/V_old, 100*(CL_new-CL_old)/CL_old, ...
         100*(Thrust_new-Thrust_old)/Thrust_old, 100*(Energy_new-Energy_old)/max(Energy_old,1e-9));
+
 end

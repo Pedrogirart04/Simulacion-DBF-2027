@@ -127,7 +127,7 @@ fprintf('Datos cargados.\n\n');
 % --- Log de datos ---
 t_max_est = 600; % Estimación de tiempo máximo de vuelo [s]
 max_pasos = ceil(t_max_est / dt) + 2000;
-inform = zeros(27, max_pasos);
+inform = zeros(28, max_pasos);
 step_idx = 0;
 
 % --- Estado del avión ---
