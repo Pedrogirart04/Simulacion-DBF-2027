@@ -129,12 +129,13 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         T_total = T_yaw * T_pitch * T_roll;
         
         % --- VELOCIDADES RELATIVAS (El viento se resta en el plano horizontal) ---
-        V_rel = [V_curr(1); V_curr(2); V_curr(3)] - E_wind;
-        v_rel_mag = sqrt(V_rel(1)^2 + V_rel(2)^2 + V_rel(3)^2);
-        v_safe = max(v_rel_mag, 1e-6);
         
-        V_versor = V_rel / v_safe;
-        v_normal_helice = abs(dot(T_total * [1;0;0], V_rel));
+        V_a = [V_curr(1); V_curr(2); V_curr(3)] - E_wind; %v_airspeed
+        v_a_mag = norm(V_a);
+        v_safe = max(v_a_mag, 1e-6);
+        
+        versor_a = V_a / v_safe; %esta es la direccion del airspeed
+        v_normal_helice = abs(dot(T_total * [1;0;0], V_a));
         
         % Fuerza de Lorentz (Efecto de cizalladura lateral en X-Y)
         F_lorentz_wind = q_air * cross([V_curr(1); V_curr(2); V_curr(3)], B_wind);
@@ -201,11 +202,11 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         drag = 0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq;
         
         thrust_vec = T_total * [ Thrust_N ; 0; 0 ];  
-        drag_vec   = -drag * V_versor;               % Resistencia opuesta al viento relativo
+        drag_vec   = -drag * versor_a;               % Resistencia opuesta al viento relativo
         
         % Sustentación en Ejes Viento
         Y_body_dir = T_total * [0; 1; 0];           % Eje lateral (envergadura)
-        L_dir      = cross(V_versor, Y_body_dir);    % Vector ortogonal
+        L_dir      = cross(versor_a, Y_body_dir);    % Vector ortogonal
         L_norm     = norm(L_dir);
         if L_norm > 1e-6
             L_dir = L_dir / L_norm;
