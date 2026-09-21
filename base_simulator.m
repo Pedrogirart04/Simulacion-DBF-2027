@@ -12,7 +12,7 @@ tic
 MTOW     = 8;           % [kg] Masa total de despegue
 S_ref    = 1.386;        % [m²] Superficie alar de referencia
 b        = 2.5;          % [m]  Envergadura (para reportes)
-cd0      = 0.016;        % [-]  Factor de Corrección Drag (Ver con Mati)
+cd0      = 0.05;        % [-]  Factor de Corrección Drag (Ver con Mati)
 CL_max   = 0.62;         % [-]  CL máximo de la polar (para warning de stall)
 
 % --- Propulsión ---
@@ -35,25 +35,25 @@ t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
 
 circuito = [
     % --- TRAMO 1: Recta ---
-    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, 'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 2: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 3: Recta ---
-    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 4: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 5: Recta ---
-    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 6: Giro 360
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1800, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 6: Recta
-    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1800, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 ];
 
 % Estado inicial de la velocidad angular del motor
@@ -127,7 +127,7 @@ fprintf('Datos cargados.\n\n');
 % --- Log de datos ---
 t_max_est = 600; % Estimación de tiempo máximo de vuelo [s]
 max_pasos = ceil(t_max_est / dt) + 2000;
-inform = zeros(28, max_pasos);
+inform = zeros(29, max_pasos);
 step_idx = 0;
 
 % --- Estado del avión ---
