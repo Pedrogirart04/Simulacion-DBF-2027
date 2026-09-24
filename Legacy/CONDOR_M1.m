@@ -251,6 +251,6 @@ plot_results_report(inform, t, Energy, S, plane1, motor1, prop1, MTOW, throttle,
 
 
 % --- EXPORTAR DATOS ---
-tabla_vuelo = array2table(inform', 'VariableNames', {'x','y','z','v_x','v_y','v_z','a_x','a_y','a_z','t','cl','cd_total','drag','Thrust_N','LIFT_x','LIFT_y','LIFT_z','THRUST_x','THRUST_y','THRUST_z','DRAG_x','DRAG_y','DRAG_z','Corriente_real','E_wind_x','E_wind_y','roll_rad','omega'});
+tabla_vuelo = array2table(inform', 'VariableNames', {'x','y','z','v_x','v_y','v_z','a_x','a_y','a_z','t','cl','cd_total','drag','Thrust_N','LIFT_x','LIFT_y','LIFT_z','THRUST_x','THRUST_y','THRUST_z','DRAG_x','DRAG_y','DRAG_z','Corriente_real','E_wind_x','E_wind_y','roll_rad','omega','extra1'});
 writetable(tabla_vuelo, 'datos_vuelo_avion.csv');
 disp('✈️ Datos de vuelo');

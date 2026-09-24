@@ -28,8 +28,6 @@ throttle = 1643;         % [μs]    Señal PWM al ESC (fijo por ahora)
 % =========================================================================
 % CIRCUITO Y MISIÓN (INDIVIDUAL POR TRAMO)
 
-%Elapsed time 53.613225 seconds, 0.352Ah 37sec
-
 n_vueltas    = 1;     % Cantidad de vueltas
 t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
 
@@ -38,22 +36,22 @@ circuito = [
     struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, 'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 2: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1954, 'heading_offset', 15.5, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 3: Recta ---
     struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 4: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 2050, 'heading_offset',16, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 5: Recta ---
-    struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    %struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 6: Giro 360
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    %struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 6: Recta
-    struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    %struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 ];
 
 % Estado inicial de la velocidad angular del motor
@@ -69,7 +67,7 @@ S_Banner  = 0;           % [m²] Superficie del banner
 cd_Banner = 0;           % [-]  CD del banner
 
 % --- Simulación ---
-dt       = 0.1;         % [s] Paso de tiempo del integrador
+dt       = 0.5;         % [s] Paso de tiempo del integrador
 t_max    = 300;          % [s] Tiempo máximo de misión (5 min)
 
 % --- Scoring (ajustar según misión) ---
@@ -256,6 +254,7 @@ for vuelta = 1:n_vueltas
             
         end % while en_tramo
     end % for tramo
+    vueltas_completadas = vueltas_completadas + 1;
 end % for vuelta
 
 % Recorte final de la matriz de datos al número exacto de pasos
