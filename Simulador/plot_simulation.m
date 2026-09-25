@@ -58,7 +58,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     log_drag    = inform(13, :);
     log_thrust  = inform(14, :);
     log_current = inform(24, :);
-    log_roll    = inform(27, :);
+    log_roll    = inform(28, :);
 
     % Variables derivadas
     log_v_mag   = sqrt(log_vx.^2 + log_vy.^2 + log_vz.^2);
