@@ -14,6 +14,7 @@ S_ref    = 1.386;        % [m²] Superficie alar de referencia
 b        = 2.5;          % [m]  Envergadura (para reportes)
 cd0      = 0.05;        % [-]  Factor de Corrección Drag (Ver con Mati)
 CL_max   = 0.62;         % [-]  CL máximo de la polar (para warning de stall)
+crud     = 1;            % [-]  Factor de conservadurismo de drag: drag = drag*crud 
 
 % --- Propulsión ---
 prop_file  = 'PER3_20x10E.dat';
@@ -36,7 +37,7 @@ throttle_rate_max = 1000;   % [us/s]           tasa máxima de cambio de throttl
 
 
 % --- Despegue ---
-despegue_on         = true;   % on/off: si es false, arranca directo en vuelo (como antes)
+despegue_on         = false;   % on/off: si es false, arranca directo en vuelo (como antes)
 mu_rodadura         = 0.05;   % [-] fricción de rodadura en pista
 k_rot               = 1.15;   % [-] margen de V_takeoff sobre V_stall
 CL_suelo            = 0;      % [-] CL supuesto en actitud de pista
@@ -44,31 +45,36 @@ gamma_obj_deg       = 12;     % [deg] ángulo de trayectoria objetivo del ascens
 z_objetivo_despegue = 40;     % [m] altura de nivelación (arranca crucero)
 throttle_despegue   = 2000;   % [us] throttle fijo durante todo el despegue
 
+% --- Batería: warnings de SoC + aborto de misión ---
+Q_bateria    = 3.3;             % [Ah] DEBE coincidir con Q hardcodeada en airplane_dynamics_opt.m y simular_despegue.m
+soc_umbrales = [75 50 30 20 15 10];   % [%] umbrales de aviso; en el más bajo (<=10%) se aborta la misión
+
 % =========================================================================
 % CIRCUITO Y MISIÓN (INDIVIDUAL POR TRAMO)
 
 n_vueltas    = 1;     % Cantidad de vueltas
 t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
+V_min_offset = 3;     % [m/s] piso de seguridad para heading_offset = C/V (evita dividir por V chica)
 
 circuito = [
     % --- TRAMO 1: Recta ---
     struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
-           'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 0,...
+           'modo_control', 'throttle', 'valor_ref', 1954, ...
            'fase_cd0', 'crucero','wind_steady', [8; 2;0], 'turbulencia', 'moderate'), ...
 
     % --- TRAMO 2: Giro
     struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180, 'bank_deg', 60, ...
-           'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 15.5,...
+           'modo_control', 'throttle', 'valor_ref', 1954, ...
            'fase_cd0', 'crucero','wind_steady', [8; 2; 0], 'turbulencia', 'moderate'), ...
 
     % --- TRAMO 3: Recta (V cte)
     struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
-           'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 0,...
+           'modo_control', 'throttle', 'valor_ref', 1954, ...
             'fase_cd0','crucero','wind_steady', [8; 2; 0], 'turbulencia', 'moderate'), ...
 
     % --- TRAMO 4: Giro
     struct('tipo', 'giro', 'largo_m', 0, 'delta_yaw_deg', 180, 'bank_deg', 60, ...
-           'modo_control', 'CL', 'valor_ref', CL_max*0.9-0.1, 'heading_offset', 16,...
+           'modo_control', 'CL', 'valor_ref', CL_max*0.9-0.1, ...
            'fase_cd0', 'crucero','wind_steady', [8; 2; 0], 'turbulencia', 'none'), ...
 
     % --- TRAMO 5: Recta ---
@@ -93,8 +99,8 @@ bank_angle = max([circuito.bank_deg]);
 S_Banner  = 0;           % [m²] Superficie del banner
 cd_Banner = 0;           % [-]  CD del banner
 
-% --- Simulación ---
-dt       = 0.25;         % [s] Paso de tiempo del integrador
+% --- Parametros de Simulación ---
+dt       = 0.1;         % [s] Paso de tiempo del integrador
 t_max    = 300;          % [s] Tiempo máximo de misión (5 min)
 
 % --- Scoring (ajustar según misión) ---
@@ -173,6 +179,10 @@ t_por_vuelta = zeros(1, n_vueltas);   % Guardar tiempo de cada vuelta
 
 mision_abortada = false; %Por si se quiere abortar la misión
 
+% --- Estado de avisos de batería (SoC) ---
+soc_avisado   = false(size(soc_umbrales));   % marca qué umbrales ya avisamos (una vez cada uno)
+t_soc_avisos  = NaN(size(soc_umbrales));     % tiempo [s] en que se cruzó cada umbral (NaN si no se cruzó)
+
 % --- Pre-cálculos del circuito ---
 % Convertir ángulos a radianes una sola vez
 bank_rad = deg2rad(bank_angle);
@@ -204,7 +214,7 @@ if despegue_on
         simular_despegue(MTOW, dt, rho, S_ref, cd0, CL_max, CL_suelo, mu_rodadura, k_rot, ...
                           gamma_obj_deg, z_objetivo_despegue, throttle_despegue, ...
                           PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, ...
-                          wn, max_pitch_rate);
+                          wn, max_pitch_rate, crud);
 
     inform(:, 1:n_pasos_despegue) = inform_despegue;
     step_idx = n_pasos_despegue;
@@ -242,7 +252,17 @@ for vuelta = 1:n_vueltas
         else
             turbulencia_tramo = turbulencia_default;
         end
-
+        
+         % --- Offset de anticipación de salida de giro (heading_offset) ---
+        if strcmp(tramo.tipo, 'giro')
+            if isfield(tramo, 'heading_offset') && ~isempty(tramo.heading_offset)
+                heading_offset_manual = deg2rad(tramo.heading_offset);
+                usar_offset_manual    = true;
+            else
+                C_turn             = calc_offset_giro(deg2rad(tramo.bank_deg), wn);
+                usar_offset_manual  = false;
+            end
+        end
 
         % Registro de punto inicial del tramo
         x_start = x; 
@@ -264,6 +284,7 @@ for vuelta = 1:n_vueltas
         
         while en_tramo
             yaw_prev = yaw_rad;
+            V_inst   = sqrt(v_x^2 + v_y^2 + v_z^2);   
             
             % --- 1. CÁLCULO DEL ALABEO(YAW) OBJETIVO ---
             if strcmp(tramo.tipo, 'recta')
@@ -290,17 +311,21 @@ for vuelta = 1:n_vueltas
                     break;
                 end
                 
-            elseif strcmp(tramo.tipo, 'giro')
-                % Condición con offset para iniciar el des-alabeo a tiempo
-                target_yaw_rad = abs(deg2rad(tramo.delta_yaw_deg)) - deg2rad(tramo.heading_offset);
-                if yaw_acum >= target_yaw_rad
-                    en_tramo = false;
-                    break;
-                end
-            end
+             elseif strcmp(tramo.tipo, 'giro')
+                    % Offset de anticipación: manual si está definido en el tramo, si no C_turn/V (automático)
+                    if usar_offset_manual
+                        heading_offset_rad = heading_offset_manual;
+                    else
+                        heading_offset_rad = C_turn / max(V_inst, V_min_offset);
+                    end
+                    target_yaw_rad = abs(deg2rad(tramo.delta_yaw_deg)) - heading_offset_rad;
+                    if yaw_acum >= target_yaw_rad
+                        en_tramo = false;
+                        break;
+                    end
+             end
             
             dt_pierna = t - t_inicio_pierna;
-            V_inst = sqrt(v_x^2 + v_y^2 + v_z^2);
             cd0_actual = case_cd0(tramo.fase_cd0, dt_pierna, V_inst, [], cd0);
 
        % --- CONTROL DE THROTTLE SEGÚN VARIABLE DE REFERENCIA DEL TRAMO ---
@@ -352,19 +377,46 @@ for vuelta = 1:n_vueltas
                     throttle, cd0_actual, ...
                     PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
                     Energy, t, S_Banner, cd_Banner, CL_max, ...
-                    V_inst, wind_steady_tramo, turbulencia_tramo);
+                    V_inst, wind_steady_tramo, turbulencia_tramo,crud);
                             
             % --- 5. ALMACENAMIENTO EN LOG PREASIGNADO ---
             inform(:, step_idx) = [log_step; modo_code; V_obj; throttle_ctrl; pitch_rad];
             
-            % --- 6. CÁLCULO DE ÁNGULO GIRADO ACUMULADO ---
+            % --- 6. CONTROL DE ESTADO DE CARGA DE BATERÍA (AVISOS + ABORTO) ---
+            soc_pct = 100 * (1 - Energy/Q_bateria);
+            for k_soc = 1:length(soc_umbrales)
+                if ~soc_avisado(k_soc) && soc_pct <= soc_umbrales(k_soc)
+                    soc_avisado(k_soc)  = true;
+                    t_soc_avisos(k_soc) = t;
+                    if soc_umbrales(k_soc) > 10
+                        fprintf('  >> AVISO BATERÍA: SoC = %.0f%% (umbral %d%%) en t = %.1f s\n', ...
+                                soc_pct, soc_umbrales(k_soc), t);
+                    else
+                        fprintf('  >> CORTE DE MISIÓN: SoC = %.0f%% <= %d%% en t = %.1f s. Abortando.\n', ...
+                                soc_pct, soc_umbrales(k_soc), t);
+                        mision_abortada = true;
+                    end
+                end
+            end
+
+            % --- 7. CÁLCULO DE ÁNGULO GIRADO ACUMULADO ---
             dyaw = yaw_rad - yaw_prev;
             if dyaw > pi,  dyaw = dyaw - 2*pi; end
             if dyaw < -pi, dyaw = dyaw + 2*pi; end
             yaw_acum = yaw_acum + abs(dyaw);
+
+            if mision_abortada
+                break;
+            end
             
         end % while en_tramo
+        if mision_abortada
+            break;
+        end
     end % for tramo
+    if mision_abortada
+        break;
+    end
     t_por_vuelta(vuelta) = t - t_inicio_vuelta;
     vueltas_completadas = vueltas_completadas + 1;
 end % for vuelta
@@ -380,6 +432,11 @@ inform = inform(:, 1:step_idx);
 fprintf('============================================\n');
 fprintf('         RESUMEN DE VUELO\n');
 fprintf('============================================\n');
+
+if mision_abortada
+    fprintf(' *** MISIÓN ABORTADA POR BATERÍA BAJA (SoC <= %d%%) ***\n', min(soc_umbrales));
+end
+
 fprintf(' Avión:            %s\n', polar_file);
 fprintf(' Motor:            %s\n', motor_file);
 fprintf(' Hélice:           %s\n', prop_file);
@@ -507,7 +564,7 @@ plot_modo_control = true;   % on/off: overlay V_obj sobre V_ms + panel de modo a
 
 panels = {
     {'V_ms','Airspeed_ms'}
-    {{'Pitch_deg'},{'Altitude_m'}}
+    {'Altitude_m'}
     {'Throttle_us'}
     {'Thrust_N','Drag_N'}
     {{'Corriente_A'}, {'Energia_Ah'}}
@@ -524,5 +581,6 @@ panels = {
 
 plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                 MTOW, rho, S_ref, CL_max, t, ...
-                plot1_on, plot2_on, panels, plot_modo_control);
+                plot1_on, plot2_on, panels, plot_modo_control, ...
+                t_soc_avisos, soc_umbrales);
 

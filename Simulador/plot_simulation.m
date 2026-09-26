@@ -1,6 +1,10 @@
 function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                          MTOW, rho, S_ref, CL_max, t_total, ...
-                         plot1_on, plot2_on, panels, plot_modo_control)
+                         plot1_on, plot2_on, panels, plot_modo_control, ...
+                         t_soc_avisos, soc_umbrales)
+
+    if nargin < 13, t_soc_avisos = []; end
+    if nargin < 14, soc_umbrales = []; end
 
 % PLOT_SIMULATION Genera gráficos de la simulación de vuelo.
 %
@@ -187,6 +191,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
 
         ax = gobjects(n_panels, 1);
         colors = lines(8);
+        panel_es_bateria = false(n_panels, 1);   % marca paneles con Corriente_A / Energia_Ah (para las marcas de SoC)
 
         for p = 1:n_panels
             ax(p) = subplot(n_panels, 1, p);
@@ -195,6 +200,13 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
             panel_p = panels{p};
             is_dual_axis = iscell(panel_p) && numel(panel_p) == 2 && ...
                            iscell(panel_p{1}) && iscell(panel_p{2});
+
+            if is_dual_axis
+                vars_check = [panel_p{1}, panel_p{2}];
+            else
+                vars_check = panel_p;
+            end
+            panel_es_bateria(p) = any(strcmp(vars_check, 'Corriente_A')) || any(strcmp(vars_check, 'Energia_Ah'));
 
             if is_dual_axis
                 vars_left  = panel_p{1};
@@ -314,11 +326,36 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                       'LineWidth', 0.7, 'Alpha', 0.6);
             end
         end
+        
         for k = 1:length(t_marcas)
             xline(ax(1), t_marcas(k), '--', sprintf('V%d', k), ...
                   'Color', [0.5 0.5 0.5], 'LineWidth', 0.7, ...
                   'LabelOrientation', 'horizontal', ...
                   'LabelVerticalAlignment', 'bottom', 'FontSize', 7);
+        end
+
+        % --- Marcas de umbrales de batería (SoC) sobre los paneles de potencia ---
+        if ~isempty(t_soc_avisos) && ~isempty(soc_umbrales)
+            primer_panel_bateria = find(panel_es_bateria, 1, 'first');
+            for p = 1:n_panels
+                if ~panel_es_bateria(p)
+                    continue;
+                end
+                for k = 1:length(soc_umbrales)
+                    if isnan(t_soc_avisos(k))
+                        continue;
+                    end
+                    if p == primer_panel_bateria
+                        xline(ax(p), t_soc_avisos(k), '--', sprintf('%d%%', soc_umbrales(k)), ...
+                              'Color', [0.85 0.33 0.10], 'LineWidth', 0.9, ...
+                              'LabelOrientation', 'horizontal', ...
+                              'LabelVerticalAlignment', 'top', 'FontSize', 7);
+                    else
+                        xline(ax(p), t_soc_avisos(k), '--', ...
+                              'Color', [0.85 0.33 0.10], 'LineWidth', 0.9, 'Alpha', 0.8);
+                    end
+                end
+            end
         end
 
         xlabel(ax(end), 'Tiempo [s]');

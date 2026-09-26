@@ -1,11 +1,14 @@
 function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] = simular_despegue( ...
     MTOW, dt, rho, S_ref, cd0, CL_max, CL_suelo, mu_rodadura, k_rot, gamma_obj_deg, z_objetivo, ...
-    throttle_despegue, PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, wn, max_pitch_rate)
+    throttle_despegue, PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, wn, max_pitch_rate, crud)
 % SIMULAR_DESPEGUE Integra rodaje + rotación + climb-out + nivelación.
 % Devuelve el estado final (listo como condición inicial de la Sección 5)
 % y una matriz de log compatible con "inform" (33 filas).
 %
 % Simplificación: viento calmo durante todo el despegue.
+    if nargin < 20 || isempty(crud)
+        crud = 1;
+    end
 
     g = 9.81;
     gamma_obj = deg2rad(gamma_obj_deg);
@@ -54,7 +57,7 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
         I_motor = max((throttle_real*Vocv - Ke*omega_eq)/(Rint + throttle_real^2*Rbat), 0);
         I_batt  = throttle_real * I_motor;
 
-        Drag     = 0.5*rho*S_ref*CD_suelo*V^2 + 0.5*S_Banner*rho*cd_Banner*V^2;
+        Drag     = (0.5*rho*S_ref*CD_suelo*V^2 + 0.5*S_Banner*rho*cd_Banner*V^2) * crud;
         Friccion = mu_rodadura * MTOW * g;
         a_long   = (Thrust_N - Drag - Friccion) / MTOW;
 
@@ -112,7 +115,7 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
         [~, Avion_fila] = avion_cl(AVION_TABLE, cl);
         cd_total = Avion_fila.c_d + cd0_local;
         Lift = lift_required;
-        Drag = 0.5*rho*S_ref*cd_total*V^2 + 0.5*S_Banner*rho*cd_Banner*V^2;
+        Drag = (0.5*rho*S_ref*cd_total*V^2 + 0.5*S_Banner*rho*cd_Banner*V^2) * crud;
 
         thrust_vec = [Thrust_N*cos(pitch_rad); 0; Thrust_N*sin(pitch_rad)];
         drag_vec   = [-Drag*cos(pitch_rad);    0; -Drag*sin(pitch_rad)];

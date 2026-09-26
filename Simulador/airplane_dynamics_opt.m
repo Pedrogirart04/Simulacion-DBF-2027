@@ -1,7 +1,7 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                                                                                           PROP_TABLE, MOTOR_TABLE,AVION_TABLE, ...
                                                                                           Energy,t,S_Banner,cd_Banner,CL_max, ...
-                                                                                          Va_0,wind_steady,turbulance)
+                                                                                          Va_0,wind_steady,turbulance,crud)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
     if nargin < 23 || isempty(CL_max)
@@ -15,6 +15,9 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
     end
     if nargin < 26 || isempty(turbulance)
         turbulance = 'light';
+    end
+    if nargin < 27 || isempty(crud)
+        crud = 1;  
     end
 
     P = [x; y; z];
@@ -188,7 +191,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
 
         cd_total = Avion_fila.c_d + cd0;
         lift = 0.5 * ro * S_ref * cl * v_safe_sq;
-        drag = 0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq;
+        drag = (0.5 * ro * S_ref * cd_total * v_safe_sq + 0.5 * (S_Banner) * ro * (cd_Banner) * v_safe_sq) * crud;
         
         thrust_vec = T_total * [ Thrust_N ; 0; 0 ];  
         drag_vec   = -drag * versor_a;               % Resistencia opuesta al viento relativo
