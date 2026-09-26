@@ -100,7 +100,7 @@ S_Banner  = 0;           % [m²] Superficie del banner
 cd_Banner = 0;           % [-]  CD del banner
 
 % --- Parametros de Simulación ---
-dt       = 0.25;         % [s] Paso de tiempo del integrador
+dt       = 0.05;         % [s] Paso de tiempo del integrador
 t_max    = 300;          % [s] Tiempo máximo de misión (5 min)
 
 % --- Scoring (ajustar según misión) ---
@@ -259,7 +259,7 @@ for vuelta = 1:n_vueltas
                 heading_offset_manual = deg2rad(tramo.heading_offset);
                 usar_offset_manual    = true;
             else
-                C_turn             = calc_offset_giro(deg2rad(tramo.bank_deg), wn);
+                C_turn = calc_offset_giro(deg2rad(tramo.bank_deg), wn, dt);
                 usar_offset_manual  = false;
             end
         end

@@ -1,33 +1,34 @@
-function C = calc_offset_giro(bank_rad, wn)
+function C = calc_offset_giro(bank_rad, wn, dt)
 % CALC_OFFSET_GIRO Calcula la constante C (independiente de V) tal que el
 % ángulo de anticipación de salida de un viraje se obtiene como:
 %
 %   heading_offset(V) = C / V
 %
-% Motivo físico: al salir del tramo "giro" el banqueo no cae a 0 de forma
-% instantánea, sino que decae según el mismo filtro crítico de 2do orden
-% que ya se usa para el roll (misma respuesta cerrada, asumiendo
-% roll_rate ~= 0 en el momento de salir, válido si el viraje duró más de
-% un par de veces t_transicion):
 %
-%   roll(t) = bank_rad * (1 + wn*t) * exp(-wn*t)
+%   dpsi/dt = g * tan(roll) / V
 %
-% Mientras decae, el avión sigue virando (viraje coordinado):
-%
-%   dpsi/dt = g * tan(roll(t)) / V
-%
-% Integrando en el tiempo, el rumbo "de más" que se acumula durante ese
-% des-banqueo es:
-%
-%   offset(V) = (1/V) * g * integral( tan(roll(t)), t=0..inf ) = C / V
-%
-% Como roll(t) no depende de V, C = g*integral(tan(roll(t))dt) depende
-% solo del ángulo de banco y de wn, y se calcula una sola vez por tramo
-% (no en cada paso de integración).
 
     g = 9.81;
-    t_max_int = 6 / wn;              % tiempo suficiente para que roll(t) decaiga a ~0
-    t = linspace(0, t_max_int, 3000);
-    roll_t = bank_rad * (1 + wn*t) .* exp(-wn*t);
-    C = g * trapz(t, tan(roll_t));
+    et = exp(-wn*dt);
+
+    roll      = bank_rad;
+    roll_rate = 0;
+    acc       = 0;
+
+    for k = 1:200000   % cota de seguridad; en la práctica converge en pocas decenas de pasos
+        e0 = roll;             % target = 0
+        v0 = roll_rate;
+        e_new = (e0 + (v0 + wn*e0)*dt) * et;
+        v_new = (v0 - wn*(v0 + wn*e0)*dt) * et;
+        roll_rate = v_new;
+        roll      = e_new;
+
+        acc = acc + tan(roll) * dt;
+
+        if abs(roll) < 1e-9
+            break;
+        end
+    end
+
+    C = g * acc;
 end
