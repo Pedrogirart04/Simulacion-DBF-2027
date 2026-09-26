@@ -1,10 +1,20 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                                                                                           PROP_TABLE, MOTOR_TABLE,AVION_TABLE, ...
-                                                                                          Energy,t,S_Banner,cd_Banner,CL_max)
+                                                                                          Energy,t,S_Banner,cd_Banner,CL_max, ...
+                                                                                          Va_0,wind_steady,turbulance)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
     if nargin < 23 || isempty(CL_max)
-        CL_max = 0.62;  % valor legacy, se usa si no se pasa (compatibilidad con Legacy/CONDOR_M1.m)
+        CL_max = 0.62;  % valor legacy
+    end
+    if nargin < 24 || isempty(Va_0)
+        Va_0 = 25;
+    end
+    if nargin < 25 || isempty(wind_steady)
+        wind_steady = [5;-2;0];
+    end
+    if nargin < 26 || isempty(turbulance)
+        turbulance = 'light';
     end
 
     P = [x; y; z];
@@ -105,14 +115,9 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         
         T_total = T_yaw * T_pitch * T_roll;
         
-        % viento
-        %parametros
-        Va_0 = 25;
-        wind_steady = [5;-2;0];
-        turbulance = 'light';
-
-        %calculo v_w
+        % viento (Va_0, wind_steady, turbulance llegan como argumentos de la función)
         [v_w_i,dx_gust,~] = dryden_wind(x_gust_curr,Va_0,T_total,wind_steady,turbulance,noise);
+
 
         % --- VELOCIDADES RELATIVAS (El viento se resta en el plano horizontal) ---
         
@@ -171,7 +176,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         lift_required = (MTOW * g) / (cos_r_safe * cos_p_safe);
 
         cl = (2 * lift_required) / (ro * v_safe_sq * S_ref);
-        
+
         % --- STALL CHECK ---
         if cl > CL_max
             warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...

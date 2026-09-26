@@ -1,6 +1,6 @@
 function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                          MTOW, rho, S_ref, CL_max, t_total, ...
-                         plot1_on, plot2_on, panels)
+                         plot1_on, plot2_on, panels, plot_modo_control)
 
 % PLOT_SIMULATION Genera gráficos de la simulación de vuelo.
 %
@@ -43,6 +43,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     % (22) drag_vec_y [N]     (23) drag_vec_z [N]     (24) Corriente_real [A]
     % (25) viento_x [m/s]     (26) viento_y [m/s]     (27) viento_z [m/s]
     % (28) roll_rad [rad]     (29) omega (motor) [rad/s]
+    % (30) modo_control_code (0=throttle,1=V,2=CL)   (31) V_obj [m/s] (NaN si modo=throttle)
 
     log_x       = inform(1, :);    log_y       = inform(2, :);
     log_z       = inform(3, :);    log_vx      = inform(4, :);
@@ -61,12 +62,19 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     log_dt     = [0, diff(log_t)];
     log_energy = cumsum(log_current .* log_dt) / 3600;
 
-        log_omega   = inform(29, :);
     log_windx   = inform(25, :);
+    log_windy = inform(26, :);
+    log_windz = inform(27, :);
+    log_airspeed = sqrt((log_vx - log_windx).^2 + (log_vy - log_windy).^2 + (log_vz - log_windz).^2);
+    
+    log_omega   = inform(29, :);
     log_rpm     = log_omega * 60/(2*pi);
+    log_modo_code = inform(30, :);
+    log_V_obj     = inform(31, :);
+    log_throttle = inform(32, :);
 
     % Mapa nombre -> vector, para el sistema de panels configurables
-    logvars = struct( ...
+        logvars = struct( ...
         'V_ms',        log_v_mag, ...
         'CL',          log_cl, ...
         'CD',          log_cd, ...
@@ -78,13 +86,23 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
         'Roll_deg',    log_roll_deg, ...
         'Altitude_m',  log_z, ...
         'RPM',         log_rpm, ...
-        'Viento_x_ms', log_windx);
+        'Viento_x_ms', log_windx, ...
+        'Viento_y_ms', log_windy, ...
+        'Viento_z_ms', log_windz,...
+        'Airspeed_ms', log_airspeed, ...
+        'V_obj',              log_V_obj, ...
+        'modo_control_code',  log_modo_code, ...
+        'Throttle_us',        log_throttle);
 
     label_map = containers.Map( ...
         {'V_ms','CL','CD','LD','Thrust_N','Drag_N','Corriente_A', ...
-         'Energia_Ah','Roll_deg','Altitude_m','RPM','Viento_x_ms'}, ...
+         'Energia_Ah','Roll_deg','Altitude_m','RPM','Viento_x_ms', ...
+         'V_obj','modo_control_code','Throttle_us','Airspeed_ms', ...
+         'Viento_y_ms','Viento_z_ms'}, ...
         {'V [m/s]','C_L','C_D','L/D','Thrust [N]','Drag [N]','Corriente [A]', ...
-         'Energía [Ah]','Roll [°]','Altitud [m]','RPM','Viento_x [m/s]'});
+         'Energía [Ah]','Roll [°]','Altitud [m]','RPM','Viento_x [m/s]', ...
+         'V_{obj} [m/s]','Modo de Control','Throttle [µs]','Airspeed [m/s]', ...
+         'Viento_y [m/s]','Viento_z [m/s]'});
 
 
     % Marcas de inicio de cada vuelta
@@ -149,104 +167,144 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
     % =====================================================================
     
     if plot2_on
+        if plot_modo_control
+            for p = 1:length(panels)
+                panel_p = panels{p};
+                is_dual = iscell(panel_p) && numel(panel_p) == 2 && ...
+                          iscell(panel_p{1}) && iscell(panel_p{2});
+                if ~is_dual && any(strcmp(panel_p, 'V_ms')) && ~any(strcmp(panel_p, 'V_obj'))
+                    panels{p}{end+1} = 'V_obj';
+                end
+            end
+            panels{end+1} = {'modo_control_code'};
+        end
+
         n_panels = length(panels);
         figure('Name', 'Performance de Vuelo', 'NumberTitle', 'off', ...
                'Units', 'normalized', 'Position', [0.45 0.03 0.5 0.92]);
-    
+
         ax = gobjects(n_panels, 1);
         colors = lines(8);
-    
-            for p = 1:n_panels
-        ax(p) = subplot(n_panels, 1, p);
-        hold on; grid on;
 
-        panel_p = panels{p};
-        is_dual_axis = iscell(panel_p) && numel(panel_p) == 2 && ...
-                       iscell(panel_p{1}) && iscell(panel_p{2});
+        for p = 1:n_panels
+            ax(p) = subplot(n_panels, 1, p);
+            hold on; grid on;
 
-        if is_dual_axis
-            % --- Panel de doble eje: panel_p{1} = izquierda, panel_p{2} = derecha ---
-            vars_left  = panel_p{1};
-            vars_right = panel_p{2};
+            panel_p = panels{p};
+            is_dual_axis = iscell(panel_p) && numel(panel_p) == 2 && ...
+                           iscell(panel_p{1}) && iscell(panel_p{2});
 
-            yyaxis left
-            legend_left = {};
-            for v = 1:length(vars_left)
-                var_name = vars_left{v};
-                if ~isfield(logvars, var_name)
-                    warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
-                    continue;
+            if is_dual_axis
+                vars_left  = panel_p{1};
+                vars_right = panel_p{2};
+
+                yyaxis left
+                legend_left = {};
+                data_left = [];
+                for v = 1:length(vars_left)
+                    var_name = vars_left{v};
+                    if ~isfield(logvars, var_name)
+                        warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
+                        continue;
+                    end
+                    plot(log_t, logvars.(var_name), 'LineWidth', 1.0);
+                    data_left = [data_left, logvars.(var_name)];
+                    if isKey(label_map, var_name)
+                        legend_left{end+1} = label_map(var_name);
+                    else
+                        legend_left{end+1} = strrep(var_name, '_', ' ');
+                    end
+                    if strcmp(var_name, 'CL')
+                        yline(CL_max, '--r', sprintf('CL_{max} = %.2f', CL_max), ...
+                              'LineWidth', 1.0, 'LabelHorizontalAlignment', 'left', 'FontSize', 7);
+                    end
                 end
-                plot(log_t, logvars.(var_name), 'LineWidth', 1.0);
-                if isKey(label_map, var_name)
-                    legend_left{end+1} = label_map(var_name);
-                else
-                    legend_left{end+1} = strrep(var_name, '_', ' ');
+                ylabel(strjoin(legend_left, ' / '));
+                if ~isempty(data_left)
+                    v_min = min(data_left); v_max = max(data_left);
+                    v_range = max(v_max - v_min, eps);
+                    ylim([v_min - 0.1*v_range, v_max + 0.1*v_range]);
                 end
-                if strcmp(var_name, 'CL')
-                    yline(CL_max, '--r', sprintf('CL_{max} = %.2f', CL_max), ...
-                          'LineWidth', 1.0, 'LabelHorizontalAlignment', 'left', 'FontSize', 7);
+
+                yyaxis right
+                legend_right = {};
+                data_right = [];
+                for v = 1:length(vars_right)
+                    var_name = vars_right{v};
+                    if ~isfield(logvars, var_name)
+                        warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
+                        continue;
+                    end
+                    plot(log_t, logvars.(var_name), 'LineWidth', 1.0);
+                    data_right = [data_right, logvars.(var_name)];
+                    if isKey(label_map, var_name)
+                        legend_right{end+1} = label_map(var_name);
+                    else
+                        legend_right{end+1} = strrep(var_name, '_', ' ');
+                    end
+                end
+                ylabel(strjoin(legend_right, ' / '));
+                if ~isempty(data_right)
+                    v_min = min(data_right); v_max = max(data_right);
+                    v_range = max(v_max - v_min, eps);
+                    ylim([v_min - 0.1*v_range, v_max + 0.1*v_range]);
+                end
+
+                legend_entries = [legend_left, legend_right];
+                if length(legend_entries) > 1
+                    legend(legend_entries, 'Location', 'eastoutside', 'FontSize', 7);
+                end
+                title(strjoin(legend_entries, ', '));
+
+            else
+                % --- Panel de eje único ---
+                vars_p = panel_p;
+                legend_entries = {};
+                data_p = [];
+
+                for v = 1:length(vars_p)
+                    var_name = vars_p{v};
+                    if ~isfield(logvars, var_name)
+                        warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
+                        continue;
+                    end
+                    if strcmp(var_name, 'modo_control_code')
+                        stairs(log_t, logvars.(var_name), 'Color', colors(v,:), 'LineWidth', 1.2);
+                        yticks([0 1 2]);
+                        yticklabels({'Throttle','V','CL'});
+                        ylim([-0.5 2.5]);
+                    else
+                        plot(log_t, logvars.(var_name), 'Color', colors(v,:), 'LineWidth', 1.0);
+                        data_p = [data_p, logvars.(var_name)];
+                    end
+                    if isKey(label_map, var_name)
+                        legend_entries{end+1} = label_map(var_name);
+                    else
+                        legend_entries{end+1} = strrep(var_name, '_', ' ');
+                    end
+                    if strcmp(var_name, 'CL')
+                        yline(CL_max, '--r', sprintf('CL_{max} = %.2f', CL_max), ...
+                              'LineWidth', 1.0, 'LabelHorizontalAlignment', 'left', 'FontSize', 7);
+                    end
+                end
+
+                if length(vars_p) > 1
+                    legend(legend_entries, 'Location', 'eastoutside', 'FontSize', 7);
+                    ylabel(strjoin(legend_entries, ' / '));
+                elseif ~isempty(legend_entries)
+                    ylabel(legend_entries{1});
+                end
+
+                title(strjoin(legend_entries, ', '));
+
+                if ~isempty(data_p)
+                    v_min = min(data_p); v_max = max(data_p);
+                    v_range = max(v_max - v_min, eps);
+                    ylim([v_min - 0.1*v_range, v_max + 0.1*v_range]);
                 end
             end
-            ylabel(strjoin(legend_left, ' / '));
-
-            yyaxis right
-            legend_right = {};
-            for v = 1:length(vars_right)
-                var_name = vars_right{v};
-                if ~isfield(logvars, var_name)
-                    warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
-                    continue;
-                end
-                plot(log_t, logvars.(var_name), 'LineWidth', 1.0);
-                if isKey(label_map, var_name)
-                    legend_right{end+1} = label_map(var_name);
-                else
-                    legend_right{end+1} = strrep(var_name, '_', ' ');
-                end
-            end
-            ylabel(strjoin(legend_right, ' / '));
-
-            legend_entries = [legend_left, legend_right];
-            if length(legend_entries) > 1
-                legend(legend_entries, 'Location', 'eastoutside', 'FontSize', 7);
-            end
-            title(strjoin(legend_entries, ', '));
-
-        else
-            % --- Panel de eje único (como antes) ---
-            vars_p = panel_p;
-            legend_entries = {};
-
-            for v = 1:length(vars_p)
-                var_name = vars_p{v};
-                if ~isfield(logvars, var_name)
-                    warning('plot_simulation: variable "%s" no reconocida, se omite.', var_name);
-                    continue;
-                end
-                plot(log_t, logvars.(var_name), 'Color', colors(v,:), 'LineWidth', 1.0);
-                if isKey(label_map, var_name)
-                    legend_entries{end+1} = label_map(var_name);
-                else
-                    legend_entries{end+1} = strrep(var_name, '_', ' ');
-                end
-                if strcmp(var_name, 'CL')
-                    yline(CL_max, '--r', sprintf('CL_{max} = %.2f', CL_max), ...
-                          'LineWidth', 1.0, 'LabelHorizontalAlignment', 'left', 'FontSize', 7);
-                end
-            end
-
-            if length(vars_p) > 1
-                legend(legend_entries, 'Location', 'eastoutside', 'FontSize', 7);
-                ylabel(strjoin(legend_entries, ' / '));
-            elseif ~isempty(legend_entries)
-                ylabel(legend_entries{1});
-            end
-
-            title(strjoin(legend_entries, ', '));
         end
-    end
-    
+
         % --- Marcas de vuelta en todos los paneles ---
         for p = 1:n_panels
             for k = 1:length(t_marcas)
@@ -260,7 +318,7 @@ function plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
                   'LabelOrientation', 'horizontal', ...
                   'LabelVerticalAlignment', 'bottom', 'FontSize', 7);
         end
-    
+
         xlabel(ax(end), 'Tiempo [s]');
         linkaxes(ax, 'x');
     end

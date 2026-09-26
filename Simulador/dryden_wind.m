@@ -11,11 +11,15 @@ function [v_w_i,dx_gust,gust_b] = dryden_wind(x_gust,V_a,T_total,wind_steady,tur
 L_u = 200;
 L_v = 200;
 L_w = 50;
-if strcmp(turbulance,'light')
+if strcmp(turbulance,'none')
+    sigma_u = 0;
+    sigma_v = 0;
+    sigma_w = 0;
+elseif strcmp(turbulance,'light')
     sigma_u = 1.06;
     sigma_v = 1.06;
     sigma_w = 0.7;
-else
+else  % 'moderate' (o cualquier valor no reconocido)
     sigma_u = 2.12;
     sigma_v = 2.12;
     sigma_w = 1.4;
