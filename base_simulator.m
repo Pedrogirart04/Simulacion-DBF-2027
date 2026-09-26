@@ -22,8 +22,13 @@ polar_file = 'CONDOR.dat';
 
 % --- Condiciones de vuelo ---
 rho      = 1.225;        % [kg/m³] Densidad del aire (ISA nivel del mar)
-V_inicio = 20;           % [m/s]   Velocidad inicial (arranque ya en vuelo)
-throttle = 1643;         % [μs]    Señal PWM al ESC (fijo por ahora)
+V_inicio = 20;           % [m/s]   Velocidad inicial (Arranque ya en vuelo)
+throttle = 1643;         % [μs]    Señal PWM al ESC (Valor de Referencia)
+
+% --- Control de tramos por variable de referencia ---
+Kp_throttle       = 15;    % [us / (m/s)]     ganancia proporcional del PI de velocidad
+Ki_throttle       = 5;     % [us / (m/s)/s]   ganancia integral del PI de velocidad
+throttle_rate_max = 400;   % [us/s]           tasa máxima de cambio de throttle (todos los modos)
 
 % =========================================================================
 % CIRCUITO Y MISIÓN (INDIVIDUAL POR TRAMO)
@@ -33,25 +38,29 @@ t_transicion = 1.0;   % [s] Tiempo para maniobra de rolido (0 a bank)
 
 circuito = [
     % --- TRAMO 1: Recta ---
-    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, 'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
+           'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
-    % --- TRAMO 2: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,   'bank_deg', 60, 'throttle', 1954, 'heading_offset', 15.5, 'fase_cd0', 'crucero'), ...
+    % --- TRAMO 2: Giro
+    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180, 'bank_deg', 60, ...
+           'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 15.5, 'fase_cd0', 'crucero'), ...
 
-    % --- TRAMO 3: Recta ---
-    struct('tipo', 'recta', 'largo_m', 130,  'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
-
-    % --- TRAMO 4: Giro 
-    struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 180,  'bank_deg', 60, 'throttle', 2050, 'heading_offset',16, 'fase_cd0', 'crucero'), ...
+    % --- TRAMO 3: Recta (V cte)
+    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
+           'modo_control', 'V', 'valor_ref', 20, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+           
+    % --- TRAMO 4: Giro
+    struct('tipo', 'giro', 'largo_m', 0, 'delta_yaw_deg', 180, 'bank_deg', 60, ...
+           'modo_control', 'throttle', 'valor_ref', 2050, 'heading_offset', 16, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 5: Recta ---
-    %struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
+    %struct('tipo', 'recta', 'largo_m', 90, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
+    %       'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 
     % --- TRAMO 6: Giro 360
-    %struct('tipo', 'giro',  'largo_m', 0,   'delta_yaw_deg', 360,  'bank_deg', 60, 'throttle', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
+    %struct('tipo', 'giro', 'largo_m', 0, 'delta_yaw_deg', 360, 'bank_deg', 60, ...
+    %       'modo_control', 'throttle', 'valor_ref', 1954, 'heading_offset', 13, 'fase_cd0', 'crucero'), ...
 
-    % --- TRAMO 6: Recta
-    %struct('tipo', 'recta', 'largo_m', 5, 'delta_yaw_deg', 0,    'bank_deg', 0,  'throttle', 1954, 'heading_offset', 0, 'fase_cd0', 'crucero'), ...
 ];
 
 % Estado inicial de la velocidad angular del motor
@@ -149,6 +158,10 @@ mision_abortada = false; %Por si se quiere abortar la misión
 % Convertir ángulos a radianes una sola vez
 bank_rad = deg2rad(bank_angle);
 
+% --- Estado del controlador de throttle (para tramos con V o CL de referencia) ---
+throttle_ctrl      = throttle;   % arranca en el throttle inicial de la config
+e_prev             = 0;
+modo_control_prev  = '';
 
 fprintf('=== INICIO DE SIMULACIÓN ===\n');
 fprintf('MTOW = %.1f kg | V_ini = %.1f m/s | Bank = %.0f°\n', MTOW, V_inicio, bank_angle);
@@ -171,10 +184,17 @@ fprintf('Despegue: SALTADO (arranca en vuelo a %.1f m/s)\n\n', V_inicio);
 % =========================================================================
 
 for vuelta = 1:n_vueltas
+        t_inicio_vuelta = t;
     for t_idx = 1:length(circuito)
         
         tramo = circuito(t_idx);
-        throttle = tramo.throttle;
+        if isfield(tramo, 'modo_control')
+            modo_control = tramo.modo_control;
+            valor_ref    = tramo.valor_ref;
+        else
+            modo_control = 'throttle';
+            valor_ref    = tramo.throttle;
+        end
         
         % Registro de punto inicial del tramo
         x_start = x; 
@@ -233,6 +253,39 @@ for vuelta = 1:n_vueltas
             V_inst = sqrt(v_x^2 + v_y^2 + v_z^2);
             cd0_actual = case_cd0(tramo.fase_cd0, dt_pierna, V_inst, [], cd0);
 
+       % --- CONTROL DE THROTTLE SEGÚN VARIABLE DE REFERENCIA DEL TRAMO ---
+            switch modo_control
+                case 'throttle'
+                    throttle_obj = valor_ref;
+
+                case 'V'
+                    V_obj = valor_ref;
+                    if ~strcmp(modo_control_prev,'V') && ~strcmp(modo_control_prev,'CL')
+                        e_prev = V_obj - V_inst;  
+                    end
+                    e = V_obj - V_inst;
+                    throttle_obj = throttle_ctrl + Kp_throttle*(e - e_prev) + Ki_throttle*e*dt;
+                    e_prev = e;
+
+                case 'CL'
+                    V_obj = sqrt(2*MTOW*9.81 / (rho*S_ref*cos(roll_rad)*cos(pitch_rad)*valor_ref));
+                    if ~strcmp(modo_control_prev,'V') && ~strcmp(modo_control_prev,'CL')
+                        e_prev = V_obj - V_inst;
+                    end
+                    e = V_obj - V_inst;
+                    throttle_obj = throttle_ctrl + Kp_throttle*(e - e_prev) + Ki_throttle*e*dt;
+                    e_prev = e;
+            end
+            modo_control_prev = modo_control;
+
+            % --- LIMITADOR DE TASA (mismo criterio que el banqueo) + CLAMP FÍSICO ---
+            d_thr = throttle_obj - throttle_ctrl;
+            throttle_ctrl = throttle_ctrl + sign(d_thr) * min(abs(d_thr), throttle_rate_max*dt);
+            throttle_ctrl = min(max(throttle_ctrl, 1225), 2000);
+
+            throttle = throttle_ctrl;
+
+
            % --- 4. INTEGRACIÓN FÍSICA Y DINÁMICA (FIRMA ACTUAL SIN OMEGA) ---
             step_idx = step_idx + 1;
             
@@ -242,7 +295,7 @@ for vuelta = 1:n_vueltas
                     throttle, cd0_actual, ...
                     PROP_TABLE, MOTOR_TABLE, AVION_TABLE, ...
                     Energy, t, S_Banner, cd_Banner,CL_max);
-                
+                            
             % --- 5. ALMACENAMIENTO EN LOG PREASIGNADO ---
             inform(:, step_idx) = log_step;
             
@@ -254,6 +307,7 @@ for vuelta = 1:n_vueltas
             
         end % while en_tramo
     end % for tramo
+    t_por_vuelta(vuelta) = t - t_inicio_vuelta;
     vueltas_completadas = vueltas_completadas + 1;
 end % for vuelta
 
@@ -383,10 +437,30 @@ disp("----- \n")
 disp("Tiempo de Simulacion \n")
 toc
 disp("----- \n")
+
 %% ========================================================================
 %  SECCIÓN 7: GRÁFICOS
 %  ========================================================================
 
+% --- Configuración de gráficos ---
+plot1_on = true;   % Trayectorias 2D/3D
+plot2_on = true;   % Panel de variables vs tiempo
+
+% Cada fila de panels = un subplot. Cada celda dentro = una variable.
+% Nombres disponibles: V_ms, CL, CD, LD, Thrust_N, Drag_N, Corriente_A,
+%                       Energia_Ah, Roll_deg, Altitude_m, RPM, Viento_x_ms
+% Si se coloca doble llave es doble eje {{'Corriente_A'}, {'Energia_Ah'}}
+
+panels = {
+    {'V_ms'}
+    {'CL','CD'}
+    {'LD'}
+    {'Thrust_N','Drag_N'}
+    {{'Corriente_A'}, {'Energia_Ah'}}
+    {'Roll_deg'}
+};
+
 plot_simulation(inform, t_por_vuelta, vueltas_completadas, ...
-                MTOW, rho, S_ref, CL_max, t);
+                MTOW, rho, S_ref, CL_max, t, ...
+                plot1_on, plot2_on, panels);
 

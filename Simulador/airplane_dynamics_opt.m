@@ -67,7 +67,21 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
 
 
     % --- LOGGEO EN LA MATRIZ INFORM ---
-   log_step = [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3); t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
+
+    %Matriz Inform: Contenidos
+    % (1) x [m]              (2) y [m]              (3) z [m]
+    % (4) v_x [m/s]           (5) v_y [m/s]           (6) v_z [m/s]
+    % (7) a_x [m/s^2]         (8) a_y [m/s^2]         (9) a_z [m/s^2]
+    % (10) t [s]              (11) cl                 (12) cd_total
+    % (13) drag [N]           (14) Thrust_N [N]       (15) lift_vec_x [N]
+    % (16) lift_vec_y [N]     (17) lift_vec_z [N]     (18) thrust_vec_x [N]
+    % (19) thrust_vec_y [N]   (20) thrust_vec_z [N]   (21) drag_vec_x [N]
+    % (22) drag_vec_y [N]     (23) drag_vec_z [N]     (24) Corriente_real [A]
+    % (25) viento_x [m/s]     (26) viento_y [m/s]     (27) viento_z [m/s]
+    % (28) roll_rad [rad]     (29) omega (motor) [rad/s]
+
+   log_step = [x; y; z; v_x; v_y; v_z; extra.a(1); extra.a(2); extra.a(3);
+             t; extra.cl; extra.cd_total; extra.drag; extra.Thrust_N; ...
              extra.lift_vec(1); extra.lift_vec(2); extra.lift_vec(3); ...
              extra.thrust_vec(1); extra.thrust_vec(2); extra.thrust_vec(3); ...
              extra.drag_vec(1); extra.drag_vec(2); extra.drag_vec(3); ...
@@ -157,8 +171,8 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         lift_required = (MTOW * g) / (cos_r_safe * cos_p_safe);
 
         cl = (2 * lift_required) / (ro * v_safe_sq * S_ref);
+        
         % --- STALL CHECK ---
-
         if cl > CL_max
             warning('STALL: CL_req = %.2f > CL_max = %.2f | V = %.1f m/s | roll = %.1f°', ...
                     cl, CL_max, v_safe, rad2deg(roll_rad));
