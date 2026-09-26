@@ -34,6 +34,16 @@ Kp_throttle       = 30;    % [us / (m/s)]     ganancia proporcional del PI de ve
 Ki_throttle       = 15;     % [us / (m/s)/s]   ganancia integral del PI de velocidad
 throttle_rate_max = 1000;   % [us/s]           tasa máxima de cambio de throttle (todos los modos)
 
+
+% --- Despegue ---
+despegue_on         = true;   % on/off: si es false, arranca directo en vuelo (como antes)
+mu_rodadura         = 0.05;   % [-] fricción de rodadura en pista
+k_rot               = 1.15;   % [-] margen de V_takeoff sobre V_stall
+CL_suelo            = 0;      % [-] CL supuesto en actitud de pista
+gamma_obj_deg       = 12;     % [deg] ángulo de trayectoria objetivo del ascenso
+z_objetivo_despegue = 40;     % [m] altura de nivelación (arranca crucero)
+throttle_despegue   = 2000;   % [us] throttle fijo durante todo el despegue
+
 % =========================================================================
 % CIRCUITO Y MISIÓN (INDIVIDUAL POR TRAMO)
 
@@ -142,7 +152,7 @@ fprintf('Datos cargados.\n\n');
 % --- Log de datos ---
 t_max_est = 600; % Estimación de tiempo máximo de vuelo [s]
 max_pasos = ceil(t_max_est / dt) + 2000;
-inform = zeros(32, max_pasos);
+inform = zeros(33, max_pasos);
 step_idx = 0;
 
 % --- Estado del avión ---
@@ -170,6 +180,7 @@ bank_rad = deg2rad(bank_angle);
 % --- Parámetros del filtro de 2do orden (banqueo, crítico) ---
 wn             = 5.8 / t_transicion;   % frecuencia natural [rad/s] (t_transicion ~ tiempo de establecimiento al 2%)
 max_roll_rate  = 3 * wn * bank_rad;    % tope de seguridad generoso, no debería activarse en operación normal
+max_pitch_rate = 3 * wn * deg2rad(gamma_obj_deg);   % tope de seguridad análogo, para el pitch del despegue
 
 % --- Estado del controlador de throttle (para tramos con V o CL de referencia) ---
 throttle_ctrl      = throttle;   % arranca en el throttle inicial de la config
@@ -188,8 +199,20 @@ fprintf('dt = %.3f s | t_max = %.0f s\n\n', dt, t_max);
 %% ========================================================================
 %  SECCIÓN 4: DESPEGUE
 %  ========================================================================
-% TODO: Implementar modelo de despegue
-fprintf('Despegue: SALTADO (arranca en vuelo a %.1f m/s)\n\n', V_inicio);
+if despegue_on
+    [x, y, z, v_x, v_y, v_z, pitch_rad, yaw_rad, t, Energy, inform_despegue, n_pasos_despegue] = ...
+        simular_despegue(MTOW, dt, rho, S_ref, cd0, CL_max, CL_suelo, mu_rodadura, k_rot, ...
+                          gamma_obj_deg, z_objetivo_despegue, throttle_despegue, ...
+                          PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, ...
+                          wn, max_pitch_rate);
+
+    inform(:, 1:n_pasos_despegue) = inform_despegue;
+    step_idx = n_pasos_despegue;
+    fprintf('Despegue: %.1f m de pista+ascenso, %.1f s, altura final %.1f m, V final %.1f m/s\n\n', ...
+            x, t, z, sqrt(v_x^2+v_y^2+v_z^2));
+else
+    fprintf('Despegue: SALTADO (arranca en vuelo a %.1f m/s)\n\n', V_inicio);
+end
 
 
 %% =========================================================================
@@ -332,7 +355,7 @@ for vuelta = 1:n_vueltas
                     V_inst, wind_steady_tramo, turbulencia_tramo);
                             
             % --- 5. ALMACENAMIENTO EN LOG PREASIGNADO ---
-            inform(:, step_idx) = [log_step; modo_code; V_obj; throttle_ctrl];
+            inform(:, step_idx) = [log_step; modo_code; V_obj; throttle_ctrl; pitch_rad];
             
             % --- 6. CÁLCULO DE ÁNGULO GIRADO ACUMULADO ---
             dyaw = yaw_rad - yaw_prev;
@@ -484,6 +507,7 @@ plot_modo_control = true;   % on/off: overlay V_obj sobre V_ms + panel de modo a
 
 panels = {
     {'V_ms','Airspeed_ms'}
+    {{'Pitch_deg'},{'Altitude_m'}}
     {'Throttle_us'}
     {'Thrust_N','Drag_N'}
     {{'Corriente_A'}, {'Energia_Ah'}}
