@@ -492,54 +492,11 @@ switch scoring_type
         fprintf('============================================\n\n');
 
     case 'M2'
-        % ==== MISIÓN 2: Charter Flight ====
-        % Constantes de scoring (Table 3.3.3.2 — ajustar a reglas 2027)
-        Ip1 = 6;     % Ingreso fijo por pasajero
-        Ip2 = 2;     % Ingreso por pasajero por vuelta
-        Ic1 = 10;    % Ingreso fijo por cargo
-        Ic2 = 8;     % Ingreso por cargo por vuelta
-        Ce  = 10;    % Costo operativo base por vuelta
-        Cp  = 0.5;   % Costo operativo por pasajero por vuelta
-        Cc  = 2;     % Costo operativo por cargo por vuelta
-        EF  = 1;     % Factor de eficiencia
-
-        laps = vueltas_estimadas;
-        Income = (n_pasajeros * (Ip1 + Ip2 * laps)) + ...
-                 (n_cargo * (Ic1 + Ic2 * laps));
-        Cost = laps * (Ce + n_pasajeros * Cp + n_cargo * Cc) * EF;
-        Net_Income = Income - Cost;
-
-        fprintf('============================================\n');
-        fprintf('       SCORING MISIÓN 2: CHARTER FLIGHT\n');
-        fprintf('============================================\n');
-        fprintf(' Pasajeros:    %d\n', n_pasajeros);
-        fprintf(' Cargo:        %d unidades\n', n_cargo);
-        fprintf(' Vueltas:      %d (en %.0f s)\n', laps, t_max);
-        fprintf('--------------------------------------------\n');
-        fprintf(' Ingreso:      $ %.2f\n', Income);
-        fprintf(' Costo:        $ %.2f\n', Cost);
-        fprintf('--------------------------------------------\n');
-        fprintf(' >> NET INCOME:  $ %.2f <<\n', Net_Income);
-        fprintf('============================================\n\n');
+        % ==== MISIÓN 2:  ====
+        % Ajustar las fórmulas según las reglas DBF 2027
 
     case 'M3'
-        % ==== MISIÓN 3: Banner Flight ====
-        m_to_ft = 3.28084;
-        l_banner_ft = l_banner * m_to_ft;
-        RAC = MTOW * 2.20462;   % kg a lbs como estimación de RAC
-
-        laps = vueltas_estimadas;
-        Team_N = (laps * l_banner_ft) / RAC;
-
-        fprintf('============================================\n');
-        fprintf('       SCORING MISIÓN 3: BANNER FLIGHT\n');
-        fprintf('============================================\n');
-        fprintf(' Banner:       %.1f m (%.1f ft)\n', l_banner, l_banner_ft);
-        fprintf(' RAC:          %.2f lbs\n', RAC);
-        fprintf(' Vueltas:      %d (en %.0f s)\n', laps, t_max);
-        fprintf('--------------------------------------------\n');
-        fprintf(' >> FACTOR N:    %.4f <<\n', Team_N);
-        fprintf('============================================\n\n');
+        % ==== MISIÓN 3:  ====
 
     case 'none'
         % Sin scoring — solo el resumen de vuelo de arriba
