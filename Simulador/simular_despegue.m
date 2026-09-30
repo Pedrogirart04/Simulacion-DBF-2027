@@ -1,6 +1,6 @@
 function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] = simular_despegue( ...
     MTOW, dt, rho, S_ref, cd0, CL_max, CL_suelo, mu_rodadura, k_rot, gamma_obj_deg, z_objetivo, ...
-    throttle_despegue, PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, wn, max_pitch_rate, crud)
+    throttle_despegue, PROP_TABLE, MOTOR_TABLE, AVION_TABLE, S_Banner, cd_Banner, wn, max_pitch_rate, crud, Q_bateria)
 % SIMULAR_DESPEGUE Integra rodaje + rotación + climb-out + nivelación.
 % Devuelve el estado final (listo como condición inicial de la Sección 5)
 % y una matriz de log compatible con "inform" (33 filas).
@@ -9,12 +9,15 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
     if nargin < 20 || isempty(crud)
         crud = 1;
     end
+    if nargin < 21 || isempty(Q_bateria)
+        Q_bateria = 3.3;
+    end
 
     g = 9.81;
     gamma_obj = deg2rad(gamma_obj_deg);
 
     % --- Batería y motor (mismos valores que en airplane_dynamics_opt) ---
-    ncells = 8; Q = 3.3; E0 = 4.19; K = 0.02; A = 0.2; B = 4; Rbat = 0.024;
+    ncells = 8; E0 = 4.19; K = 0.02; A = 0.2; B = 4; Rbat = 0.024;
     Kt = 0.0308; Ke = 0.0308; Rint = 0.00865; I0 = 1.71;
     omega_seed = 300;
 
@@ -48,7 +51,7 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
     while V < V_takeoff
         v_air = max(V, 1e-3);
 
-        Vocv = battery_cntm_local(Energy, ncells, Q, E0, K, A, B);
+        Vocv = battery_cntm_local(Energy, ncells, Q_bateria, E0, K, A, B);
         omega_eq = motor_prop_eq_local(throttle_real, Vocv, v_air, PROP_TABLE, Kt, Ke, Rint, I0, Rbat, omega_seed);
         omega_seed = omega_eq;
         Prop_fila = interpProp(PROP_TABLE, v_air, omega_eq*60/(2*pi));
@@ -71,6 +74,10 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
         t = t + dt;
     end
 
+    x_rodaje = x;   % distancia de rodaje (solo Fase 1), antes del climb-out
+    t_rodaje = t;   % tiempo de rodaje
+    fprintf('Fin de rodaje: x = %.1f m | t = %.2f s | V = %.1f m/s\n', x_rodaje, t_rodaje, V);
+
     % =====================================================================
     % FASE 2: ROTACIÓN + CLIMB-OUT + NIVELACIÓN
     % =====================================================================
@@ -92,7 +99,7 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
 
         v_air = max(V, 1e-3);
 
-        Vocv = battery_cntm_local(Energy, ncells, Q, E0, K, A, B);
+        Vocv = battery_cntm_local(Energy, ncells, Q_bateria, E0, K, A, B);
         omega_eq = motor_prop_eq_local(throttle_real, Vocv, v_air, PROP_TABLE, Kt, Ke, Rint, I0, Rbat, omega_seed);
         omega_seed = omega_eq;
         Prop_fila = interpProp(PROP_TABLE, v_air, omega_eq*60/(2*pi));
@@ -101,7 +108,7 @@ function [x,y,z,v_x,v_y,v_z,pitch_rad,yaw_rad,t,Energy,inform_despegue,n_pasos] 
         I_motor = max((throttle_real*Vocv - Ke*omega_eq)/(Rint + throttle_real^2*Rbat), 0);
         I_batt  = throttle_real * I_motor;
 
-        % --- Sustentación de ascenso: L = W*cos(pitch) (¡no divide, multiplica!) ---
+        % --- Sustentación de ascenso: L = W*cos(pitch) ---
         lift_required = MTOW*g*cos(pitch_rad);
         v_safe_sq = max(V^2, 1e-6);
         cl = 2*lift_required / (rho*v_safe_sq*S_ref);

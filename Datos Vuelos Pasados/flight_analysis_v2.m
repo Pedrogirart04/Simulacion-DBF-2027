@@ -16,7 +16,7 @@ clc; clear; close all;
 %  CONFIGURACIÓN — Modificar según el vuelo
 %  ========================================================================
 
-csv_file = 'CONDOR-S-2026-04-02-15-35-21.csv';
+csv_file = 'CONDOR-S-2026-04-02-17-03-20.csv';
 
 % Rango de throttle del transmisor (para normalizar a 0-100%)
 throttle_min = -1024;   % Valor de throttle con stick abajo (0%)

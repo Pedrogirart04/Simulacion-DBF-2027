@@ -62,6 +62,9 @@ function data = leer_vuelo(csv_file)
         end
     end
 
+    if ismember('Throttle', raw.Properties.VariableNames)
+    raw.Throttle_2048 = raw.Throttle + 1024;   % 0 (idle) a 2048 (full throttle)
+    end
     % Generar columna t_s si no existe
     if ~ismember('t_s', raw.Properties.VariableNames)
         if ismember('Time', raw.Properties.VariableNames)

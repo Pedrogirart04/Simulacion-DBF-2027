@@ -1,7 +1,7 @@
 function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airplane_dynamics_opt(MTOW,t_n,ro,S_ref,x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,throttle,cd0, ...
                                                                                           PROP_TABLE, MOTOR_TABLE,AVION_TABLE, ...
                                                                                           Energy,t,S_Banner,cd_Banner,CL_max, ...
-                                                                                          Va_0,wind_steady,turbulance,crud)
+                                                                                          Va_0,wind_steady,turbulance,crud,Q_bateria)
 
     % --- CONFIGURACIÓN DE VECTORES DE ESTADO PARA RK4 ---
     if nargin < 23 || isempty(CL_max)
@@ -18,6 +18,9 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
     end
     if nargin < 27 || isempty(crud)
         crud = 1;  
+    end
+    if nargin < 28 || isempty(Q_bateria)
+        Q_bateria = 3.3;  % valor legacy
     end
 
     P = [x; y; z];
@@ -136,7 +139,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         throttle_real = (throttle - 1225)/(2000-1225); % Cambio el throttle para que el valor sea de 0 a 1
        % Datos de la bateria 
         ncells = 8;
-        Q = 3.3;
+        %Q = 3.3; %Entra como parametro en base_simulator.m
         E0 = 4.19;
         K = 0.02;
         A = 0.2;
@@ -150,7 +153,7 @@ function [x,y,z,v_x,v_y,v_z,roll_rad,pitch_rad,yaw_rad,log_step,Energy,t] = airp
         Ke   = 0.0308;   % [V*s/rad] constante de fcem (=Kt en SI)
         Rint = 0.00865;  % [ohm] resistencia interna del bobinado
         I0   = 1.71;     % [A] corriente sin carga
-        Vocv = battery_cntm(E,ncells,Q,E0,K,A,B); % Tension de circuito abierto o fuente ideal dependiente del estado de carga
+        Vocv = battery_cntm(E,ncells,Q_bateria,E0,K,A,B); % Tension de circuito abierto o fuente ideal dependiente del estado de carga
         
         omega_eq = motor_prop_eq(throttle_real,Vocv,v_normal_helice,PROP_TABLE,Kt,Ke,Rint,...
                                  I0,Rbat,omega_seed); %Resuelvo el equilibrio de torque

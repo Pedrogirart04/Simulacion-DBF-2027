@@ -37,16 +37,16 @@ throttle_rate_max = 1000;   % [us/s]           tasa máxima de cambio de throttl
 
 
 % --- Despegue ---
-despegue_on         = true;   % on/off: si es false, arranca directo en vuelo (como antes)
+despegue_on         = false;   % on/off: si es false, arranca directo en vuelo (como antes)
 mu_rodadura         = 0.05;   % [-] fricción de rodadura en pista
-k_rot               = 1.4;   % [-] margen de V_takeoff sobre V_stall
+k_rot               = 1.15;   % [-] margen de V_takeoff sobre V_stall
 CL_suelo            = 0;      % [-] CL supuesto en actitud de pista
 gamma_obj_deg       = 12;     % [deg] ángulo de trayectoria objetivo del ascenso
-z_objetivo_despegue = 30;     % [m] altura de nivelación (arranca crucero)
-throttle_despegue   = 1900;   % [us] throttle fijo durante todo el despegue
+z_objetivo_despegue = 40;     % [m] altura de nivelación (arranca crucero)
+throttle_despegue   = 2000;   % [us] throttle fijo durante todo el despegue
 
 % --- Batería: warnings de SoC + aborto de misión ---
-Q_bateria    = 3.3;             % [Ah] 
+Q_bateria    = 3.3;             % [Ah] DEBE coincidir con Q hardcodeada en airplane_dynamics_opt.m y simular_despegue.m
 soc_umbrales = [75 50 30 20 15 10];   % [%] umbrales de aviso; en el más bajo (<=10%) se aborta la misión
 
 % =========================================================================
@@ -58,12 +58,12 @@ V_min_offset = 3;     % [m/s] piso de seguridad para heading_offset = C/V (evita
 
 circuito = [
     % --- TRAMO 1: Recta ---
-    struct('tipo', 'recta', 'largo_m', 100, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
+    struct('tipo', 'recta', 'largo_m', 50, 'delta_yaw_deg', 0, 'bank_deg', 0, ...
            'modo_control', 'throttle', 'valor_ref', 1954, ...
            'fase_cd0', 'crucero','wind_steady', [0; 0;0], 'turbulencia', 'moderate'), ...
 
     % --- TRAMO 2: Giro
-    struct('tipo', 'giro', 'largo_m', 0, 'delta_yaw_deg', 180, 'bank_deg', 60, ...
+    %struct('tipo', 'giro', 'largo_m', 0, 'delta_yaw_deg', 180, 'bank_deg', 60, ...
            'modo_control', 'CL', 'valor_ref', CL_max*0.9-0.1, ...
            'fase_cd0', 'crucero','wind_steady', [0; 0; 0], 'turbulencia', 'none'), ...
 
@@ -100,7 +100,7 @@ S_Banner  = 0;           % [m²] Superficie del banner
 cd_Banner = 0;           % [-]  CD del banner
 
 % --- Parametros de Simulación ---
-dt       = 0.1;         % [s] Paso de tiempo del integrador
+dt       = 0.05;         % [s] Paso de tiempo del integrador
 t_max    = 300;          % [s] Tiempo máximo de misión (5 min)
 
 % --- Scoring (ajustar según misión) ---
@@ -206,10 +206,10 @@ fprintf('=== INICIO DE SIMULACIÓN ===\n');
 fprintf('MTOW = %.1f kg | V_ini = %.1f m/s | Bank = %.0f°\n', MTOW, V_inicio, bank_angle);
 fprintf('V_stall= %.1f m/s',V_stall)
 % Extrae las rectas configuradas en el circuito
-% rectas = circuito(strcmp({circuito.tipo}, 'recta'));
-% fprintf('Circuito: piernas de %d y %d m | %d vueltas objetivo\n', ...
-%         rectas(1).largo_m, rectas(2).largo_m, n_vueltas);
-% fprintf('dt = %.3f s | t_max = %.0f s\n\n', dt, t_max);
+rectas = circuito(strcmp({circuito.tipo}, 'recta'));
+fprintf('Circuito: piernas de %d y %d m | %d vueltas objetivo\n', ...
+        rectas(1).largo_m, rectas(2).largo_m, n_vueltas);
+fprintf('dt = %.3f s | t_max = %.0f s\n\n', dt, t_max);
 
 
 %% ========================================================================
