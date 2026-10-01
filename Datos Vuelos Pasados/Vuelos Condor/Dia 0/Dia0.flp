@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="VUELO 3 ESTAB-2026-03-18-17-42-03.csv">
+         <formula>VT = (LiPo1V+LiPo2V+LiPo3V+LiPo4V+LiPo5V+LiPo6V+LiPo7V+LiPo8V)</formula>
+         <formula>Power=VT*CurrentA</formula>
+      </file>
+   </project>
+</flowfile>

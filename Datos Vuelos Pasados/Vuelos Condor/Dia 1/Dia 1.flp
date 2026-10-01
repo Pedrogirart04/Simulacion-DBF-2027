@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="Vuelo 1CONDOR-S-2026-03-25-12-26-08.csv">
+         <formula>InfoVuelo=&quot;Probamos libre fijandonos que todo funcione bien&quot;</formula>
+      </file>
+      <file filename="Vuelo 2CONDOR-S-2026-03-25-14-06-56.csv">
+         <formula>InfoVuelo=&quot;Quisimos porbar peso Fallamos por que se abrio la tapa por ponerla con cinta de papel&quot;</formula>
+      </file>
+      <file filename="Vuelo 3CONDOR-S-2026-03-25-16-47-31.csv">
+         <formula>InfoVuelo=&quot;Salimos a probar peso &quot;</formula>
+      </file>
+      <file filename="Vuelo 4CONDOR-S-2026-03-25-17-39-16.csv">
+         <formula>InfoVuelo=&quot;Probamos el Banner fallo el despliegue&quot;</formula>
+      </file>
+      <file filename="Vuelo 5CONDOR-S-2026-03-25-17-49-40.csv">
+         <formula>InfoVuelo=&quot;Probamos el Banner&quot;</formula>
+      </file>
+      <file filename="Vuelo 6CONDOR-S-2026-03-25-18-15-29.csv">
+         <formula>InfoVuelo=&quot;Probamos la velocidad mas lenta a la que pueda volar Sergio.Aprox:70km/h&quot;</formula>
+      </file>
+   </project>
+</flowfile>

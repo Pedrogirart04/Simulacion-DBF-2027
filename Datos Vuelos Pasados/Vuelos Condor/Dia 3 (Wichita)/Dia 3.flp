@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<flowfile version="1.1">
+   <project flowversion="1.0">
+      <file filename="CONDOR-S-2026-04-14-13-49-21.csv">
+         <formula>InfoVuelo=&quot;Primer Vuelo en Wichita.Volamos en M1&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-14-15-47-57.csv">
+         <formula>InfoVuelo=&quot;Volamos con carga faltaron 60 patos aprox&quot;</formula>
+      </file>
+      <file filename="CONDOR-S-2026-04-14-19-28-42.csv"/>
+      <file filename="CONDOR-S-2026-04-14-21-01-16.csv"/>
+      <file filename="CONDOR-S-2026-04-14-21-21-14.csv"/>
+      <file filename="CONDOR-S-2026-04-14-21-40-12.csv"/>
+      <file filename="CONDOR-S-2026-04-14-21-53-37.csv"/>
+   </project>
+</flowfile>
