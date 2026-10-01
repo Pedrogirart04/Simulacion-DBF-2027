@@ -17,7 +17,7 @@
 %   LiPo1..LiPo8, LS1, LS2
 
 clc; close all;
-
+addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'Vuelos Condor')));
 %% ========================================================================
 %  CONFIGURACIÓN RÁPIDA — Tocar solo esto
 %  ========================================================================

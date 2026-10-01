@@ -11,7 +11,7 @@
 %   3. Usar zoom en cualquier panel — todos se sincronizan
 
 clc; clear; close all;
-
+addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'Vuelos Condor')));
 %% ========================================================================
 %  CONFIGURACIÓN — Modificar según el vuelo
 %  ========================================================================

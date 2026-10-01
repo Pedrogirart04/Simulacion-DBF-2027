@@ -105,10 +105,10 @@ function data = leer_vuelo(csv_file)
     data = raw;
 
     % Resumen
-    fprintf('Columnas disponibles:\n');
-    cols = data.Properties.VariableNames;
-    for k = 1:length(cols)
-        fprintf('  %2d. %s\n', k, cols{k});
-    end
-    fprintf('\n');
+    % fprintf('Columnas disponibles:\n');
+    % cols = data.Properties.VariableNames;
+    % for k = 1:length(cols)
+    %     fprintf('  %2d. %s\n', k, cols{k});
+    % end
+    % fprintf('\n');
 end
